@@ -1,0 +1,7 @@
+# requirements.txt
+# 自動運転ミニカー予選タイム計測システム用ライブラリ
+
+opencv-python==4.8.1.78
+numpy==1.24.3
+pygame==2.5.2
+pathlib
