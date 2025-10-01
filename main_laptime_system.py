@@ -16,7 +16,10 @@ from datetime import datetime
 from pathlib import Path
 
 class LapTimeSystem:
-    def __init__(self):
+    def __init__(self, debug_mode=False):
+        # デバッグモード設定
+        self.debug_mode = debug_mode
+        
         # カメラ設定
         self.camera_start_line = None  # スタートライン用カメラ
         self.camera_overview = None    # 俯瞰用カメラ
@@ -107,18 +110,28 @@ class LapTimeSystem:
     
     def initialize_cameras(self):
         """カメラの初期化"""
+        if self.debug_mode:
+            print("🔧 DEBUG MODE: Running without real cameras")
+            return True
+            
         try:
             # カメラ0: 俯瞰用（メイン表示）
             self.camera_overview = cv2.VideoCapture(0)
             if not self.camera_overview.isOpened():
                 print("❌ Overview camera (index 0) failed to open")
-                return False
+                print("💡 Switching to debug mode...")
+                self.debug_mode = True
+                return True
             
             # カメラ1: スタートライン用
             self.camera_start_line = cv2.VideoCapture(1)
             if not self.camera_start_line.isOpened():
                 print("❌ Start line camera (index 1) failed to open")
-                return False
+                print("💡 Switching to debug mode...")
+                self.debug_mode = True
+                if self.camera_overview:
+                    self.camera_overview.release()
+                return True
             
             # カメラ設定
             self.camera_overview.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
