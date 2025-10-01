@@ -1,0 +1,53 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug main_laptime_system.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_laptime_system.py",
+            "console": "integratedTerminal",
+            "python": "${workspaceFolder}/laptime_debug_env/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "args": [],
+            "stopOnEntry": false,
+            "justMyCode": true,
+            "autoReload": {
+                "enable": true
+            }
+        },
+        {
+            "name": "Debug teams_simple_laptime_fixed.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/teams_simple_laptime_fixed.py",
+            "console": "integratedTerminal",
+            "python": "${workspaceFolder}/laptime_debug_env/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "args": [],
+            "stopOnEntry": false,
+            "justMyCode": true
+        },
+        {
+            "name": "Debug main_laptime_system_debug.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_laptime_system_debug.py",
+            "console": "integratedTerminal",
+            "python": "${workspaceFolder}/laptime_debug_env/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "args": [],
+            "stopOnEntry": false,
+            "justMyCode": true
+        }
+    ]
+}
