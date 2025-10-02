@@ -1,7 +1,12 @@
 # transfer_to_raspberry_pi.ps1
 # Raspberry Pi へのファイル転送スクリプト (PowerShell版)
 
-param(
+pWrite-Host "🎮 ラズパイでの実行方法:" -ForegroundColor Yellow
+Write-Host "ssh $Username@$RaspberryPiIP"
+Write-Host "cd $RemoteDir"
+Write-Host "python3 teams_simple_laptime_fixed_v2.py  # 基本版"
+Write-Host "python3 teams_simple_laptime_fixed_v3.py  # カメラ反転修正版"
+Write-Host "python3 teams_simple_laptime_fixed_v4.py  # 物体検知強化版"(
     [string]$RaspberryPiIP = "192.168.1.100",  # デフォルトIP（変更してください）
     [string]$Username = "pi",
     [string]$RemoteDir = "~/laptime_system"
@@ -50,6 +55,8 @@ Write-Host "📤 ファイルを転送中..." -ForegroundColor Blue
 
 $filesToTransfer = @(
     @{Source="teams_simple_laptime_fixed_v2.py"; Dest="teams_simple_laptime_fixed_v2.py"},
+    @{Source="teams_simple_laptime_fixed_v3.py"; Dest="teams_simple_laptime_fixed_v3.py"},
+    @{Source="teams_simple_laptime_fixed_v4.py"; Dest="teams_simple_laptime_fixed_v4.py"},
     @{Source="config_raspberry_pi.json"; Dest="config.json"},
     @{Source="raspberry_pi_debug_teams.py"; Dest="raspberry_pi_debug_teams.py"}
 )
