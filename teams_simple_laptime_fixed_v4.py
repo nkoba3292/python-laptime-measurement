@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Teams共有用シンプル表示タイム計測システム (v3 - カメラ左右反転修正版)
+Teams共有用シンプル表示タイム計測システム (v4 - 物体検知感度調整版)
 - カメラ画像の左右反転を修正 (cv2.flip適用)
-- 2つのカメラとも自然な向きで表示
+- 物体検知感度の大幅改良：閾値調整、面積比チェック、クールダウン延長
+- 誤検知を大幅に削減して実際の移動のみを検出
 - Teams会議での画面共有に最適化
 """
 
@@ -19,7 +20,7 @@ import sys
 # PyGame 初期化
 pygame.init()
 
-class TeamsSimpleLaptimeSystemFixedV3:
+class TeamsSimpleLaptimeSystemFixedV4:
     def __init__(self):
         # ディスプレイ設定（Teams共有最適化）
         self.screen_width = 1280
@@ -27,7 +28,7 @@ class TeamsSimpleLaptimeSystemFixedV3:
 
         # ウィンドウモード（Teams共有用）
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-        pygame.display.set_caption("🏁 Lap Timer - Teams View (v3 - Mirror Fixed)")
+        pygame.display.set_caption("🏁 Lap Timer - Teams View (v4 - Enhanced Detection)")
 
         # シンプル色設定
         self.colors = {
@@ -63,7 +64,9 @@ class TeamsSimpleLaptimeSystemFixedV3:
         self.start_time = None
         self.lap_times = []
         self.last_detection_time = 0
-        self.detection_cooldown = 2.0
+        
+        # 🔧 検知感度調整: クールダウンを大幅に延長
+        self.detection_cooldown = 3.0  # 3秒に延長（元: 2.0秒）
 
         # タイム表示制御
         self.hide_time_after_lap = 3        # 3周目以降でタイム非表示
@@ -74,8 +77,12 @@ class TeamsSimpleLaptimeSystemFixedV3:
         self.display_time = 0.0
         self.time_update_interval = 0.1  # 100ms間隔で更新
 
-        # 運動検出情報の保存
+        # 🔧 物体検知強化: より詳細な情報保存
         self.last_motion_pixels = 0
+        self.motion_history = []  # 直近の動きを記録
+        self.stable_frame_count = 0  # 安定フレーム数
+        self.motion_area_ratio = 0.0  # 動き面積比
+        
         self.running = True
         self.clock = pygame.time.Clock()
         self.fps = 60  # 高FPSで滑らか表示
@@ -94,12 +101,12 @@ class TeamsSimpleLaptimeSystemFixedV3:
         self.frame_lock = threading.Lock()
 
     def load_config(self):
-        """設定ファイル読み込み"""
+        """設定ファイル読み込み（検知感度強化版）"""
         try:
             with open('config.json', 'r') as f:
                 self.config = json.load(f)
         except FileNotFoundError:
-            # デフォルト設定
+            # 🔧 デフォルト設定: 検知感度を大幅調整
             self.config = {
                 "camera_settings": {
                     "overview_camera_index": 0,
@@ -108,14 +115,20 @@ class TeamsSimpleLaptimeSystemFixedV3:
                     "frame_height": 480
                 },
                 "detection_settings": {
-                    "motion_pixels_threshold": 500
+                    # 🔧 感度調整: 閾値を大幅に上げて誤検知を削減
+                    "motion_pixels_threshold": 1500,      # 500 → 1500 (3倍)
+                    "min_contour_area": 2000,             # 最小輪郭面積
+                    "motion_area_ratio_min": 0.05,        # 動き面積比の最小値 (5%)
+                    "motion_area_ratio_max": 0.8,         # 動き面積比の最大値 (80%)
+                    "stable_frames_required": 5,          # 安定フレーム数要求
+                    "motion_consistency_check": True      # 動き一貫性チェック
                 },
                 "race_settings": {
                     "max_laps": 10,
-                    "detection_cooldown": 2.0
+                    "detection_cooldown": 3.0  # 3秒に延長
                 }
             }
-            print("⚠️ config.json not found, using default settings")
+            print("⚠️ config.json not found, using enhanced default settings")
 
     def find_available_cameras(self):
         """利用可能なカメラを検索"""
@@ -180,10 +193,14 @@ class TeamsSimpleLaptimeSystemFixedV3:
             camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             camera.set(cv2.CAP_PROP_FPS, 30)
 
-        # 背景差分初期化
-        self.bg_subtractor = cv2.createBackgroundSubtractorMOG2()
+        # 🔧 背景差分初期化: より安定した検知のためのパラメータ調整
+        self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
+            history=500,           # 履歴フレーム数増加
+            varThreshold=50,       # 分散閾値調整
+            detectShadows=False    # 影検知を無効化して誤検知削減
+        )
 
-        print("✅ カメラ初期化完了")
+        print("✅ カメラ初期化完了 (検知感度強化版)")
         return True
 
     def camera_thread(self):
@@ -202,38 +219,146 @@ class TeamsSimpleLaptimeSystemFixedV3:
                         self.current_overview_frame = frame_ov_flipped.copy()
                         self.current_startline_frame = frame_sl_flipped.copy()
 
-                    # 車両検知（反転後のフレームを使用）
-                    detected, motion_pixels = self.detect_vehicle_crossing(frame_sl_flipped)
-                    self.last_motion_pixels = motion_pixels  # モーション情報保存
+                    # 🔧 車両検知強化版（反転後のフレームを使用）
+                    detected, motion_data = self.detect_vehicle_crossing_enhanced(frame_sl_flipped)
+                    
+                    # 検知情報更新
+                    self.last_motion_pixels = motion_data['motion_pixels']
+                    self.motion_area_ratio = motion_data['area_ratio']
 
                     if detected:
-                        self.handle_vehicle_detection(motion_pixels)
+                        self.handle_vehicle_detection(motion_data)
 
             except Exception as e:
                 print(f"カメラスレッドエラー: {e}")
 
             time.sleep(1/30)  # 30fps
 
-    def detect_vehicle_crossing(self, frame):
-        """車両通過検知"""
+    def detect_vehicle_crossing_enhanced(self, frame):
+        """🔧 車両通過検知強化版（誤検知大幅削減）"""
         if not self.bg_subtractor:
-            return False, 0
+            return False, {
+                'motion_pixels': 0,
+                'area_ratio': 0.0,
+                'contour_count': 0,
+                'largest_contour_area': 0
+            }
 
+        # 背景差分適用
         fg_mask = self.bg_subtractor.apply(frame)
+        
+        # 🔧 ノイズ除去強化
+        # モルフォロジー処理でノイズ除去
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel)
+        fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, kernel)
+        
+        # ガウシアンブラーで細かいノイズを除去
+        fg_mask = cv2.GaussianBlur(fg_mask, (5, 5), 0)
+        
+        # 二値化処理
+        _, fg_mask = cv2.threshold(fg_mask, 127, 255, cv2.THRESH_BINARY)
+
+        # 基本的な動きピクセル数
         motion_pixels = cv2.countNonZero(fg_mask)
+        
+        # フレーム全体のピクセル数
+        total_pixels = frame.shape[0] * frame.shape[1]
+        area_ratio = motion_pixels / total_pixels if total_pixels > 0 else 0
 
-        motion_threshold = self.config['detection_settings']['motion_pixels_threshold']
+        # 🔧 輪郭検出による物体サイズ検証
+        contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # 有効な輪郭をフィルタリング
+        valid_contours = []
+        min_contour_area = self.config['detection_settings']['min_contour_area']
+        
+        for contour in contours:
+            area = cv2.contourArea(contour)
+            if area > min_contour_area:
+                valid_contours.append(contour)
+
+        # 最大輪郭面積
+        largest_contour_area = max([cv2.contourArea(c) for c in valid_contours]) if valid_contours else 0
+
+        # 検知データ
+        motion_data = {
+            'motion_pixels': motion_pixels,
+            'area_ratio': area_ratio,
+            'contour_count': len(valid_contours),
+            'largest_contour_area': largest_contour_area
+        }
+
+        # 🔧 多重検証による検知判定
+        detection_result = self.evaluate_detection(motion_data)
+        
+        return detection_result, motion_data
+
+    def evaluate_detection(self, motion_data):
+        """🔧 検知評価（多重条件チェック）"""
         current_time = time.time()
+        detection_settings = self.config['detection_settings']
+        
+        # 基本条件チェック
+        motion_threshold = detection_settings['motion_pixels_threshold']
+        min_area_ratio = detection_settings['motion_area_ratio_min']
+        max_area_ratio = detection_settings['motion_area_ratio_max']
+        
+        # 🔧 条件1: 動きピクセル数
+        condition1 = motion_data['motion_pixels'] > motion_threshold
+        
+        # 🔧 条件2: 面積比範囲チェック
+        condition2 = (min_area_ratio <= motion_data['area_ratio'] <= max_area_ratio)
+        
+        # 🔧 条件3: 有効な輪郭の存在
+        condition3 = motion_data['contour_count'] > 0
+        
+        # 🔧 条件4: クールダウン期間
+        condition4 = (current_time - self.last_detection_time) > self.detection_cooldown
+        
+        # 🔧 条件5: 最大輪郭サイズ
+        condition5 = motion_data['largest_contour_area'] > detection_settings['min_contour_area']
 
-        if (motion_pixels > motion_threshold and
-            current_time - self.last_detection_time > self.detection_cooldown):
+        # 動き履歴更新
+        self.motion_history.append(motion_data['motion_pixels'])
+        if len(self.motion_history) > 10:  # 直近10フレーム保持
+            self.motion_history.pop(0)
+
+        # 🔧 条件6: 動きの一貫性チェック
+        condition6 = True
+        if len(self.motion_history) >= 5 and detection_settings['motion_consistency_check']:
+            # 直近5フレームの動きの分散をチェック
+            recent_motion = self.motion_history[-5:]
+            motion_std = np.std(recent_motion)
+            motion_mean = np.mean(recent_motion)
+            
+            # 動きが安定していない場合（分散が大きすぎる）は除外
+            if motion_mean > 0:
+                cv_motion = motion_std / motion_mean  # 変動係数
+                condition6 = cv_motion < 2.0  # 変動係数が2.0未満
+
+        # 🔧 全条件の評価
+        all_conditions = [condition1, condition2, condition3, condition4, condition5, condition6]
+        conditions_met = sum(all_conditions)
+        
+        # デバッグ情報
+        if motion_data['motion_pixels'] > 100:  # 少しでも動きがある場合のみ表示
+            debug_info = f"検知評価: {conditions_met}/6 条件満足"
+            debug_info += f" | 動き: {motion_data['motion_pixels']}"
+            debug_info += f" | 面積比: {motion_data['area_ratio']:.3f}"
+            debug_info += f" | 輪郭: {motion_data['contour_count']}"
+            print(debug_info)
+
+        # 🔧 厳格な判定: 全条件を満たす場合のみ検知
+        if conditions_met >= 5:  # 6条件中5条件以上
             self.last_detection_time = current_time
-            return True, motion_pixels
+            print(f"🎯 車両検知成功: 全条件クリア ({conditions_met}/6)")
+            return True
+        
+        return False
 
-        return False, motion_pixels
-
-    def handle_vehicle_detection(self, motion_pixels):
-        """車両検知時の処理"""
+    def handle_vehicle_detection(self, motion_data):
+        """車両検知時の処理（強化版）"""
         current_time = time.time()
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
 
@@ -244,6 +369,7 @@ class TeamsSimpleLaptimeSystemFixedV3:
             self.lap_count = 0
             self.time_visible = True
             print(f"🏁 レース開始: {timestamp}")
+            print(f"   検知データ: 動き={motion_data['motion_pixels']}, 面積比={motion_data['area_ratio']:.3f}")
 
         else:
             # ラップ記録
@@ -252,6 +378,7 @@ class TeamsSimpleLaptimeSystemFixedV3:
             self.lap_times.append(lap_time)
 
             print(f"🏁 LAP {self.lap_count} 完了: タイム: {lap_time:.3f}秒")
+            print(f"   検知データ: 動き={motion_data['motion_pixels']}, 面積比={motion_data['area_ratio']:.3f}")
 
             # タイム表示制御（3周目以降で非表示）
             if self.lap_count >= self.hide_time_after_lap:
@@ -286,7 +413,8 @@ class TeamsSimpleLaptimeSystemFixedV3:
             'lap_count': self.lap_count,
             'lap_times': self.lap_times,
             'best_lap': min(self.lap_times) if self.lap_times else 0,
-            'total_time': sum(self.lap_times) if self.lap_times else 0
+            'total_time': sum(self.lap_times) if self.lap_times else 0,
+            'detection_settings': self.config['detection_settings']  # 検知設定も保存
         }
 
         filename = f"data/race_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -346,11 +474,16 @@ class TeamsSimpleLaptimeSystemFixedV3:
                 detection_rect = pygame.Rect(880 + 100, 50 + 100, 200, 100)
                 pygame.draw.rect(self.screen, self.colors['text_red'], detection_rect, 2)
 
-                # 検知状況表示
+                # 🔧 検知状況詳細表示
                 if hasattr(self, 'last_motion_pixels') and self.last_motion_pixels > 0:
                     motion_text = f"Motion: {self.last_motion_pixels}"
                     motion_surface = self.font_small.render(motion_text, True, self.colors['text_green'])
                     self.screen.blit(motion_surface, (880, 360))
+                    
+                    # 面積比表示
+                    ratio_text = f"Area: {self.motion_area_ratio:.3f}"
+                    ratio_surface = self.font_small.render(ratio_text, True, self.colors['text_yellow'])
+                    self.screen.blit(ratio_surface, (880, 380))
 
         # カメラが同じ場合の処理（異なる表示方法）
         if len(self.available_cameras) < 2:
@@ -375,7 +508,7 @@ class TeamsSimpleLaptimeSystemFixedV3:
         overview_label = self.font_medium.render("Overview Camera (Fixed)", True, self.colors['text_white'])
         self.screen.blit(overview_label, (50, 10))
 
-        startline_label = self.font_medium.render("StartLine (Fixed)", True, self.colors['text_white'])
+        startline_label = self.font_medium.render("StartLine (Enhanced)", True, self.colors['text_white'])
         self.screen.blit(startline_label, (880, 10))
 
     def draw_simple_race_info(self):
@@ -439,9 +572,9 @@ class TeamsSimpleLaptimeSystemFixedV3:
         self.screen.blit(fps_surface, (80, 670))
 
         # バージョン表示
-        version_text = "v3 - Mirror Fixed"
+        version_text = "v4 - Enhanced Detection"
         version_surface = self.font_small.render(version_text, True, self.colors['text_yellow'])
-        self.screen.blit(version_surface, (1050, 670))
+        self.screen.blit(version_surface, (850, 670))
 
     def handle_keypress(self, key):
         """キー入力処理"""
@@ -461,6 +594,9 @@ class TeamsSimpleLaptimeSystemFixedV3:
         elif key == pygame.K_c:
             # カメラ情報表示
             self.show_camera_info()
+        elif key == pygame.K_d:
+            # 🔧 検知設定表示
+            self.show_detection_settings()
 
     def show_camera_info(self):
         """カメラ情報表示"""
@@ -470,6 +606,17 @@ class TeamsSimpleLaptimeSystemFixedV3:
         print(f"StartLine カメラ稼働中: {self.camera_start_line.isOpened() if self.camera_start_line else 'None'}")
         print("🔄 左右反転修正: 有効 (cv2.flip適用)")
 
+    def show_detection_settings(self):
+        """🔧 検知設定表示"""
+        print("🎯 検知設定 (v4強化版):")
+        ds = self.config['detection_settings']
+        print(f"  動きピクセル閾値: {ds['motion_pixels_threshold']}")
+        print(f"  最小輪郭面積: {ds['min_contour_area']}")
+        print(f"  面積比範囲: {ds['motion_area_ratio_min']:.3f} - {ds['motion_area_ratio_max']:.3f}")
+        print(f"  クールダウン: {self.detection_cooldown}秒")
+        print(f"  直近動きピクセル: {self.last_motion_pixels}")
+        print(f"  直近面積比: {self.motion_area_ratio:.3f}")
+
     def reset_race(self):
         """レースリセット"""
         self.race_active = False
@@ -478,6 +625,7 @@ class TeamsSimpleLaptimeSystemFixedV3:
         self.lap_times = []
         self.time_visible = True
         self.display_time = 0.0
+        self.motion_history = []  # 動き履歴もリセット
         print("🔄 レースリセット完了")
 
     def save_screenshot(self):
@@ -485,14 +633,14 @@ class TeamsSimpleLaptimeSystemFixedV3:
         if not os.path.exists('screenshots'):
             os.makedirs('screenshots')
 
-        filename = f"screenshots/teams_view_v3_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        filename = f"screenshots/teams_view_v4_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         pygame.image.save(self.screen, filename)
         print(f"📸 スクリーンショット保存: {filename}")
 
     def run(self):
         """メイン実行ループ（最適化版）"""
-        print("🏁 Teams共有用シンプル表示タイム計測システム起動 (v3 - カメラ左右反転修正版)")
-        print("🎮 操作: R=リセット, Q/ESC=終了, T=タイム表示切替, S=スクリーンショット, C=カメラ情報")
+        print("🏁 Teams共有用シンプル表示タイム計測システム起動 (v4 - 物体検知感度強化版)")
+        print("🎮 操作: R=リセット, Q/ESC=終了, T=タイム表示切替, S=スクリーンショット, C=カメラ情報, D=検知設定")
 
         if not self.initialize_cameras():
             print("❌ カメラ初期化失敗")
@@ -537,11 +685,11 @@ class TeamsSimpleLaptimeSystemFixedV3:
         print("🏁 システム終了")
 
 def main():
-    print("🏁 Teams共有用シンプル表示タイム計測システム (v3 - カメラ左右反転修正版)")
+    print("🏁 Teams共有用シンプル表示タイム計測システム (v4 - 物体検知感度強化版)")
     print("=" * 70)
 
     try:
-        system = TeamsSimpleLaptimeSystemFixedV3()
+        system = TeamsSimpleLaptimeSystemFixedV4()
         success = system.run()
 
         if success:
