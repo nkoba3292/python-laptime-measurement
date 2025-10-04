@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 """
+<<<<<<< HEAD
+Teams共有用シンプル表示タイム計測システム (v8 - 3周計測対応版)
+- 3周分の個別ラップタイム表示 (LAP1/                self.camera_start_line_id = config.get('camera_start_line_id', 0)AP2/LAP3/TOTAL)
+- ローリングスタートルール: Sキー押下後、スタートライン通過で計測開始
+- 3周完了で自動停止・結果表示
+- 極限感度設定: 高精度検出でわずかな動きも捕捉
+=======
 Teams共有用シンプル表示タイム計測システム (v8 - 極限感度版)
 - 極限まで感度を向上：motion_pixels_threshold 100, min_contour_area 50
 - 単一条件でも満たせば検知する超敏感設定
 - 最小限の動きでも確実に反応する究極の感度設定
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
 """
 
 import pygame
@@ -23,7 +31,11 @@ class TeamsSimpleLaptimeSystemFixedV8:
         self.screen_width = 1280
         self.screen_height = 720
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+<<<<<<< HEAD
+        pygame.display.set_caption("Lap Timer")
+=======
         pygame.display.set_caption("🏁 Lap Timer - Teams View (v8 - Extreme Sensitivity)")
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
         self.colors = {
             'background': (15, 15, 25),
             'text_white': (255, 255, 255),
@@ -46,6 +58,15 @@ class TeamsSimpleLaptimeSystemFixedV8:
         self.camera_overview = None
         self.camera_start_line = None
         self.bg_subtractor = None
+<<<<<<< HEAD
+        # 計測状態管理
+        self.race_ready = False  # S押し後の計測準備状態
+        self.race_active = False  # 実際の計測開始状態
+        self.lap_count = 0
+        self.current_lap_start = None
+        self.race_start_time = None
+        self.total_time = 0.0
+=======
         self.race_active = False
         self.lap_count = 0
         self.current_lap_start = None
@@ -53,6 +74,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
         self.best_lap_time = float('inf')
         self.total_time = 0.0
         self.race_start_time = None
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
         self.clock = pygame.time.Clock()
         self.running = True
         self.detection_cooldown = 0
@@ -60,6 +82,27 @@ class TeamsSimpleLaptimeSystemFixedV8:
         self.motion_detected_recently = False
         self.detection_threshold_time = 1.0
         
+<<<<<<< HEAD
+        # 3周計測用ラップタイム記録
+        self.lap_times = [0.0, 0.0, 0.0]  # LAP1, LAP2, LAP3
+        self.max_laps = 3  # 3周設定
+        self.race_complete = False  # 3周完了フラグ
+        
+        # 救済システム
+        self.rescue_mode = False  # 救済モードフラグ
+        self.rescue_countdown = 0  # 5秒カウントダウン
+        self.rescue_start_time = None  # 救済開始時刻
+        self.total_penalty_time = 0.0  # 総ペナルティ時間
+        self.rescue_paused_time = None  # 計測一時停止時の経過時間
+        
+        # v8: 極限感度設定 - わずかな動きでも検知
+        self.motion_pixels_threshold = 15000  # v7: 300 → v8: 100 (極限まで減少)
+        self.min_contour_area = 1000  # v7: 200 → v8: 50 (極小に設定)
+        self.motion_area_ratio_min = 0.0001  # さらに小さく
+        self.motion_area_ratio_max = 0.8
+        self.pixel_diff_threshold = 15  # より敏感に
+        self.detection_conditions_required = 6  # v7: 2 → v8: 1 (単一条件で検知)
+=======
         # v8: 極限感度設定 - わずかな動きでも検知
         self.motion_pixels_threshold = 100  # v7: 300 → v8: 100 (極限まで減少)
         self.min_contour_area = 50  # v7: 200 → v8: 50 (極小に設定)
@@ -67,6 +110,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
         self.motion_area_ratio_max = 0.8
         self.pixel_diff_threshold = 15  # より敏感に
         self.detection_conditions_required = 1  # v7: 2 → v8: 1 (単一条件で検知)
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
         
         self.last_motion_pixels = 0
         self.last_max_contour_area = 0
@@ -96,7 +140,11 @@ class TeamsSimpleLaptimeSystemFixedV8:
 
     def set_default_config(self):
         self.camera_overview_id = 0
+<<<<<<< HEAD
+        self.camera_start_line_id = 0  # 現在は1台のカメラのみ利用
+=======
         self.camera_start_line_id = 0
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
 
     def init_cameras(self):
         try:
@@ -121,7 +169,11 @@ class TeamsSimpleLaptimeSystemFixedV8:
             
             # v8: 極限感度の背景差分設定
             self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
+<<<<<<< HEAD
+                history=10,  # v7: 300 → v8: 100 (短い履歴で敏感に)
+=======
                 history=100,  # v7: 300 → v8: 100 (短い履歴で敏感に)
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
                 varThreshold=8,  # v7: 16 → v8: 8 (より低い閾値)
                 detectShadows=False  # 影検出無効で純粋な動き検出
             )
@@ -143,12 +195,66 @@ class TeamsSimpleLaptimeSystemFixedV8:
             self.total_time = 0.0
             self.detection_cooldown = 0
             self.last_detection_time = 0
+<<<<<<< HEAD
+            # 3周計測用ラップタイム初期化
+            self.lap_times = [0.0, 0.0, 0.0]
+            print("🏁 レース開始 - ローリングスタート準備 (v8)")
+            print("📍 スタートラインを通過してから計測開始")
+
+    def stop_race(self):
+        """レース停止"""
+        self.race_ready = False
+        self.race_active = False
+        self.race_complete = False
+        self.rescue_mode = False
+        self.rescue_countdown = 0
+        print("⏹️ 計測停止")
+
+    def start_rescue(self):
+        """救済申請開始"""
+        if self.race_active and not self.rescue_mode:
+            self.rescue_mode = True
+            self.rescue_countdown = 5.0
+            self.rescue_start_time = time.time()
+            
+            # 現在のラップ時間を一時保存
+            if self.current_lap_start:
+                self.rescue_paused_time = time.time() - self.current_lap_start
+            
+            print("🆘 救済申請！5秒ペナルティ開始")
+            print("⏳ 5秒間その場で待機してください")
+
+    def update_rescue_countdown(self):
+        """救済カウントダウン更新"""
+        if self.rescue_mode and self.rescue_countdown > 0:
+            current_time = time.time()
+            elapsed = current_time - self.rescue_start_time
+            remaining = 5.0 - elapsed
+            
+            if remaining <= 0:
+                # 救済完了
+                self.rescue_mode = False
+                self.rescue_countdown = 0
+                self.total_penalty_time += 5.0
+                
+                # 計測再開
+                if self.current_lap_start and self.rescue_paused_time:
+                    # ペナルティ時間を加算して計測再開
+                    self.current_lap_start = time.time() - self.rescue_paused_time
+                
+                print("✅ 救済完了！計測再開")
+                print(f"📊 総ペナルティ時間: {self.total_penalty_time:.1f}秒")
+                self.rescue_paused_time = None
+            else:
+                self.rescue_countdown = remaining
+=======
             print("🏁 レース開始 (v8 - Extreme Sensitivity)")
 
     def stop_race(self):
         if self.race_active:
             self.race_active = False
             print("🏁 レース終了")
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
 
     def detect_motion_advanced(self, frame):
         """v8: 極限感度の動き検出 - 単一条件でも検知"""
@@ -156,7 +262,11 @@ class TeamsSimpleLaptimeSystemFixedV8:
             current_time = time.time()
             
             # クールダウン期間チェック (v8: 2.0秒に短縮)
+<<<<<<< HEAD
+            if current_time - self.last_detection_time < 5.0:
+=======
             if current_time - self.last_detection_time < 2.0:
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
                 return False
             
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -228,6 +338,73 @@ class TeamsSimpleLaptimeSystemFixedV8:
             print(f"❌ 動き検出エラー: {e}")
             return False
 
+<<<<<<< HEAD
+    def prepare_race(self):
+        """計測準備状態へ移行（Sキー押下時）"""
+        self.race_ready = True
+        self.race_active = False
+        self.lap_count = 0
+        self.current_lap_start = None
+        self.race_start_time = None
+        self.total_time = 0.0
+        self.lap_times = [0.0, 0.0, 0.0]
+        self.race_complete = False
+        print("🛠️ 計測準備完了！ローリングスタートでスタートラインを通過してください")
+        print("🏁 スタートライン通過で計測開始します")
+
+    def start_race(self):
+        """レース開始（スタートライン通過時）"""
+        if self.race_ready and not self.race_active:
+            self.race_active = True
+            self.race_start_time = time.time()
+            self.current_lap_start = self.race_start_time
+            print("🏁 計測開始！LAP1 スタート")
+
+    def process_detection(self):
+        """検出処理とラップ計測"""
+        current_time = time.time()
+        
+        # 救済モード中は検出処理をスキップ
+        if self.rescue_mode:
+            return
+        
+        # 計測準備中にスタートライン通過で計測開始
+        if self.race_ready and not self.race_active:
+            self.start_race()
+            return
+        
+        # レース中のラップ計測
+        if self.race_active and not self.race_complete:
+            if self.current_lap_start is not None:
+                lap_time = current_time - self.current_lap_start
+                self.lap_count += 1
+                
+                # 3周までのラップタイムを記録
+                if self.lap_count <= 3:
+                    self.lap_times[self.lap_count - 1] = lap_time
+                    print(f"⏱️ LAP{self.lap_count}: {self.format_time(lap_time)}")
+                
+                # 3周完了チェック
+                if self.lap_count >= 3:
+                    self.total_time = current_time - self.race_start_time
+                    self.race_complete = True
+                    print(f"🏁 3周完了！ 総時間: {self.format_time(self.total_time)}")
+                    print("=== 最終結果 ===")
+                    for i in range(3):
+                        print(f"LAP{i+1}: {self.format_time(self.lap_times[i])}")
+                    print(f"TOTAL: {self.format_time(self.total_time)}")
+                    if self.total_penalty_time > 0:
+                        final_time = self.total_time + self.total_penalty_time
+                        print(f"ペナルティ: +{self.total_penalty_time:.1f}秒")
+                        print(f"最終時間: {self.format_time(final_time)}")
+                    return
+                
+                # 次のラップの開始時刻を設定
+                self.current_lap_start = current_time
+
+    def format_time(self, seconds):
+        """時間フォーマット - MM:SS.sss形式"""
+=======
     def process_detection(self):
         """検出処理とラップ計測"""
         if self.race_active:
@@ -248,6 +425,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
 
     def format_time(self, seconds):
         """時間フォーマット"""
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
         minutes = int(seconds // 60)
         secs = seconds % 60
         return f"{minutes:02d}:{secs:06.3f}"
@@ -319,12 +497,73 @@ class TeamsSimpleLaptimeSystemFixedV8:
         info_x = 850
         info_y = 50
         
+<<<<<<< HEAD
+        # 背景パネル（縦長に拡張）
+        panel_rect = pygame.Rect(info_x-20, info_y-20, 400, 350)
+=======
         # 背景パネル
         panel_rect = pygame.Rect(info_x-20, info_y-20, 400, 300)
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
         pygame.draw.rect(self.screen, self.colors['panel_bg'], panel_rect)
         pygame.draw.rect(self.screen, self.colors['border'], panel_rect, 3)
         
         # タイトル
+<<<<<<< HEAD
+        title = self.font_large.render("LAP INFO", True, self.colors['text_white'])
+        self.screen.blit(title, (info_x, info_y))
+        
+        # レース状態
+        if self.rescue_mode:
+            status_text = f"救済中 ({self.rescue_countdown:.1f}秒)"
+            status_color = self.colors['text_red']
+        elif self.race_ready and not self.race_active:
+            status_text = "計測準備完了"
+            status_color = self.colors['text_yellow']
+        elif self.race_active:
+            status_text = "レース中"
+            status_color = self.colors['text_green']
+        elif self.race_complete:
+            status_text = "完了"
+            status_color = self.colors['text_yellow']
+        else:
+            status_text = "待機中 (Sキーで準備)"
+            status_color = self.colors['text_red']
+        
+        status = self.font_medium.render(f"状態: {status_text}", True, status_color)
+        self.screen.blit(status, (info_x, info_y + 60))
+        
+        # 3周分のラップタイム表示
+        y_offset = 100
+        for i in range(3):
+            if self.lap_times[i] > 0:  # 記録済み
+                lap_text = f"LAP{i+1}: {self.format_time(self.lap_times[i])}"
+                color = self.colors['text_green']
+            else:  # 未記録
+                lap_text = f"LAP{i+1}: 00:00.000"
+                color = self.colors['text_white']
+            
+            lap_surface = self.font_medium.render(lap_text, True, color)
+            self.screen.blit(lap_surface, (info_x, info_y + y_offset + i * 40))
+        
+        # 総時間表示
+        if self.race_active and self.race_start_time:
+            total = time.time() - self.race_start_time
+            total_text = f"TOTAL: {self.format_time(total)}"
+        elif self.total_time > 0:  # レース完了後
+            total_text = f"TOTAL: {self.format_time(self.total_time)}"
+        else:
+            total_text = "TOTAL: 00:00.000"
+        
+        total_color = self.colors['text_yellow'] if self.lap_count >= 3 else self.colors['text_white']
+        total_surface = self.font_medium.render(total_text, True, total_color)
+        self.screen.blit(total_surface, (info_x, info_y + y_offset + 120))
+        
+        # ペナルティ時間表示
+        if self.total_penalty_time > 0:
+            penalty_text = f"ペナルティ: +{self.total_penalty_time:.1f}秒"
+            penalty_surface = self.font_small.render(penalty_text, True, self.colors['text_red'])
+            self.screen.blit(penalty_surface, (info_x, info_y + y_offset + 160))
+=======
         title = self.font_large.render("🏁 LAP INFO", True, self.colors['text_white'])
         self.screen.blit(title, (info_x, info_y))
         
@@ -353,11 +592,30 @@ class TeamsSimpleLaptimeSystemFixedV8:
             total = time.time() - self.race_start_time
             total_time = self.font_medium.render(f"総時間: {self.format_time(total)}", True, self.colors['text_white'])
             self.screen.blit(total_time, (info_x, info_y + 220))
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
 
     def draw_controls(self):
         """操作方法表示"""
         controls_y = 550
         controls = [
+<<<<<<< HEAD
+            "S: 計測準備（ローリングスタート）",
+            "R: 救済申請（5秒ペナルティ）",
+            "Q: レース停止", 
+            "ESC: 終了",
+            "📍 スタートライン通過で計測開始",
+            "� 自走不能時はRキーで救済",
+            "v8: 高感度版"
+        ]
+        
+        for i, control in enumerate(controls):
+            if i < 3:
+                color = self.colors['text_green']
+            elif i < 5:
+                color = self.colors['text_yellow']
+            else:
+                color = self.colors['text_red']
+=======
             "S: レース開始",
             "Q: レース停止", 
             "ESC: 終了",
@@ -366,6 +624,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
         
         for i, control in enumerate(controls):
             color = self.colors['text_green'] if i < 3 else self.colors['text_red']
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
             control_surface = self.font_small.render(control, True, color)
             self.screen.blit(control_surface, (20, controls_y + i * 25))
 
@@ -378,7 +637,15 @@ class TeamsSimpleLaptimeSystemFixedV8:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
                 elif event.key == pygame.K_s:
+<<<<<<< HEAD
+                    if not self.race_ready and not self.race_active:
+                        self.prepare_race()
+                elif event.key == pygame.K_r:
+                    if self.race_active and not self.rescue_mode:
+                        self.start_rescue()
+=======
                     self.start_race()
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
                 elif event.key == pygame.K_q:
                     self.stop_race()
 
@@ -391,7 +658,13 @@ class TeamsSimpleLaptimeSystemFixedV8:
             return
         
         print("🚀 システム開始 - v8 極限感度版")
+<<<<<<< HEAD
+        print("📋 操作: S=計測準備, R=救済申請, Q=停止, ESC=終了")
+        print("📋 ローリングスタート: S押下後、スタートライン通過で計測開始")
+        print("🆘 自走不能時: Rキーで救済申請（5秒ペナルティ）")
+=======
         print("📋 操作: S=開始, Q=停止, ESC=終了")
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
         
         try:
             while self.running:
@@ -414,9 +687,19 @@ class TeamsSimpleLaptimeSystemFixedV8:
                     if not ret:
                         frame_sl = None
                 
+<<<<<<< HEAD
+                # カメラ映像描画（同サイズで統一）
+                processed_ov = self.draw_camera_view(frame_ov, 30, 80, 375, 280, "Overview Camera")
+                processed_sl = self.draw_camera_view(frame_sl, 430, 80, 375, 280, "Start Line Camera")
+                
+                # 救済カウントダウン更新
+                if self.rescue_mode:
+                    self.update_rescue_countdown()
+=======
                 # カメラ映像描画
                 processed_ov = self.draw_camera_view(frame_ov, 30, 80, 400, 300, "📹 Overview Camera")
                 processed_sl = self.draw_camera_view(frame_sl, 450, 80, 350, 260, "🏁 Start Line Camera")
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
                 
                 # 動き検出（スタートラインカメラで）
                 if self.race_active and processed_sl is not None and self.bg_subtractor is not None:
