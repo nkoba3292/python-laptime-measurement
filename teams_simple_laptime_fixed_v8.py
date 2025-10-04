@@ -96,7 +96,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
 
     def set_default_config(self):
         self.camera_overview_id = 0
-        self.camera_start_line_id = 1
+        self.camera_start_line_id = 0
 
     def init_cameras(self):
         try:
