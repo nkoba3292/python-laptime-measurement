@@ -468,18 +468,18 @@ class TeamsSimpleLaptimeSystemFixedV8:
         title = self.font_large.render("3-LAP INFO", True, self.colors['text_white'])
         self.screen.blit(title, (info_x, info_y))
         
-        # レース状態
-        if self.rescue_mode:
+        # レース状態（右上のSTATUSと統一）
+        if self.race_complete:
+            status_text = "Finished"
+            status_color = self.colors['text_yellow']
+        elif self.rescue_mode:
             status_text = f"Rescue ({self.rescue_countdown:.1f}s)"
             status_color = self.colors['text_red']
-        elif self.race_ready and not self.race_active:
-            status_text = "Ready"
-            status_color = self.colors['text_yellow']
         elif self.race_active:
-            status_text = "Racing"
+            status_text = f"Qualifying Lap (LAP{self.current_lap_number})"
             status_color = self.colors['text_green']
-        elif self.race_complete:
-            status_text = "Complete"
+        elif self.race_ready:
+            status_text = "Ready for Start"
             status_color = self.colors['text_yellow']
         else:
             status_text = "Standby (S=Prepare)"
