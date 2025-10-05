@@ -381,16 +381,11 @@ class TeamsSimpleLaptimeSystemFixedV9:
         
         # 1回目：計測準備中にスタートライン通過で計測開始
         if self.race_ready and not self.race_active:
-            # 背景学習時間を十分に確保（準備開始から3秒待機）
+            # 背景学習はメインループで処理するため、ここでは3秒経過をチェックのみ
             if self.preparation_start_time and (current_time - self.preparation_start_time) < 3.0:
-                learning_time = current_time - self.preparation_start_time
-                print(f"⏳ 背景学習中... {learning_time:.1f}/3.0秒")
                 return  # 背景学習中は検出しない
             
-            print("✅ 背景学習完了！")
-            print("🎯 動体検出準備完了 - スタートライン通過で計測開始")
-            print("-" * 50)
-            # time.sleep削除: メインループをブロックしないよう修正
+            # 学習完了済み、動き検出時に計測開始
             self.start_race()
             return
         
@@ -674,6 +669,22 @@ class TeamsSimpleLaptimeSystemFixedV9:
                         if self.detect_motion_v7(processed_sl):
                             print("🔍 スタートラインで動き検出 - 処理実行")
                             self.process_detection()
+                
+                # 背景学習進行状況表示（カメラの有無に関係なく）
+                if self.race_ready and not self.race_active and self.preparation_start_time:
+                    current_time = time.time()
+                    learning_time = current_time - self.preparation_start_time
+                    if learning_time < 3.0:
+                        # 背景学習中の進行状況を定期的に表示（0.5秒ごと）
+                        if int(learning_time * 2) != getattr(self, '_last_progress_count', -1):
+                            print(f"⏳ 背景学習中... {learning_time:.1f}/3.0秒")
+                            self._last_progress_count = int(learning_time * 2)
+                    else:
+                        # 3秒経過したら学習完了
+                        print("✅ 背景学習完了！")
+                        print("🎯 動体検出準備完了 - スタートライン通過で計測開始")
+                        print("-" * 50)
+                        self.start_race()
                 
                 # UI描画
                 self.draw_lap_info()
