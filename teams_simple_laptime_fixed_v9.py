@@ -315,7 +315,8 @@ class TeamsSimpleLaptimeSystemFixedV9:
                     return False
             
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            fg_mask = self.bg_subtractor.apply(gray)
+            # 検出時は学習を停止（learningRate=0）、背景学習完了後の安定した検出のため
+            fg_mask = self.bg_subtractor.apply(gray, learningRate=0)
             
             # ノイズ除去
             kernel = np.ones((3,3), np.uint8)
@@ -671,10 +672,17 @@ class TeamsSimpleLaptimeSystemFixedV9:
                             print("🔍 スタートラインで動き検出 - 処理実行")
                             self.process_detection()
                 
-                # 背景学習進行状況表示（カメラの有無に関係なく）
+                # 背景学習進行状況表示と学習処理
                 if self.race_ready and not self.race_active and self.preparation_start_time:
                     current_time = time.time()
                     learning_time = current_time - self.preparation_start_time
+                    
+                    # 背景学習期間中は背景減算器に継続的にフレームを学習させる
+                    if processed_sl is not None and self.bg_subtractor is not None and learning_time < 3.0:
+                        # 学習専用でフレームを背景モデルに追加（検出は行わない）
+                        gray = cv2.cvtColor(processed_sl, cv2.COLOR_BGR2GRAY) if len(processed_sl.shape) == 3 else processed_sl
+                        _ = self.bg_subtractor.apply(gray, learningRate=0.1)  # 学習レート指定で安定した学習
+                    
                     if learning_time < 3.0:
                         # 背景学習中の進行状況を定期的に表示（0.5秒ごと）
                         if int(learning_time * 2) != getattr(self, '_last_progress_count', -1):
