@@ -238,6 +238,7 @@ class TeamsSimpleLaptimeSystemFixedV9:
         # 重要：クールダウンタイマーをリセットして、背景学習時間を確保
         self.last_detection_time = time.time()
         self.preparation_start_time = time.time()  # 準備開始時刻を記録
+        self._learning_completed = False  # 学習完了フラグをリセット
         
         print("🏁 計測準備完了！ローリングスタートモード")
         print("📋 待機中：スタートライン通過でTOTAL TIME計測開始")
@@ -680,11 +681,12 @@ class TeamsSimpleLaptimeSystemFixedV9:
                             print(f"⏳ 背景学習中... {learning_time:.1f}/3.0秒")
                             self._last_progress_count = int(learning_time * 2)
                     else:
-                        # 3秒経過したら学習完了
-                        print("✅ 背景学習完了！")
-                        print("🎯 動体検出準備完了 - スタートライン通過で計測開始")
-                        print("-" * 50)
-                        self.start_race()
+                        # 3秒経過したら学習完了（計測開始はしない）
+                        if not getattr(self, '_learning_completed', False):
+                            print("✅ 背景学習完了！")
+                            print("🎯 動体検出準備完了 - スタートライン通過で計測開始")
+                            print("-" * 50)
+                            self._learning_completed = True  # 一度だけ表示
                 
                 # UI描画
                 self.draw_lap_info()
