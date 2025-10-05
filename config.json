@@ -8,10 +8,17 @@
     "frame_height": 480
   },
   "detection_settings": {
-    "motion_pixels_threshold": 500
+    "motion_pixels_threshold": 300,
+    "min_contour_area": 200,
+    "detection_conditions_required": 2
   },
   "race_settings": {
-    "max_laps": 10,
-    "detection_cooldown": 2.0
+    "max_laps": 3,
+    "detection_cooldown": 2.5
+  },
+  "background_subtractor_settings": {
+    "history": 30,
+    "varThreshold": 16,
+    "detectShadows": false
   }
 }
