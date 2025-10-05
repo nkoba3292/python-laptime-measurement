@@ -18,7 +18,7 @@
   },
   "race_settings": {
     "max_laps": 3,
-    "detection_cooldown": 5.0
+    "detection_cooldown": 3.0
   },
   "background_subtractor_settings": {
     "history": 1000,

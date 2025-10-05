@@ -37,16 +37,27 @@ class TeamsSimpleLaptimeSystemFixedV10:
             'panel_bg': (40, 40, 60),
             'border': (80, 80, 100)
         }
+        
+        # フォント初期化を確実に実行
+        pygame.font.init()
+        
         try:
             self.font_huge = pygame.font.Font(None, 120)
             self.font_large = pygame.font.Font(None, 80)
             self.font_medium = pygame.font.Font(None, 48)
             self.font_small = pygame.font.Font(None, 32)
         except:
-            self.font_huge = pygame.font.SysFont('arial', 120, bold=True)
-            self.font_large = pygame.font.SysFont('arial', 80, bold=True)
-            self.font_medium = pygame.font.SysFont('arial', 48)
-            self.font_small = pygame.font.SysFont('arial', 32)
+            try:
+                self.font_huge = pygame.font.SysFont('arial', 120, bold=True)
+                self.font_large = pygame.font.SysFont('arial', 80, bold=True)
+                self.font_medium = pygame.font.SysFont('arial', 48)
+                self.font_small = pygame.font.SysFont('arial', 32)
+            except:
+                # 最終手段：デフォルトフォント
+                self.font_huge = pygame.font.Font(pygame.font.get_default_font(), 120)
+                self.font_large = pygame.font.Font(pygame.font.get_default_font(), 80)
+                self.font_medium = pygame.font.Font(pygame.font.get_default_font(), 48)
+                self.font_small = pygame.font.Font(pygame.font.get_default_font(), 32)
         
         self.camera_overview = None
         self.camera_start_line = None
@@ -460,8 +471,7 @@ class TeamsSimpleLaptimeSystemFixedV10:
                 self.current_lap_start = current_time
                 print(f"🔄 LAP{self.current_lap_number} 開始")
                 
-                # 検出時間を更新
-                self.last_detection_time = current_time
+                # 注意：last_detection_timeはメインループで更新
 
     def format_time(self, seconds):
         """時間フォーマット - MM:SS.sss形式"""
@@ -714,6 +724,9 @@ class TeamsSimpleLaptimeSystemFixedV10:
                             lap_info = f"LAP{self.current_lap_number}" if self.race_active else "READY"
                             print(f"🔍 [{lap_info}] スタートラインで動き検出 - 処理実行")
                             self.process_detection()
+                            # 検出成功時は必ずlast_detection_timeを更新
+                            self.last_detection_time = time.time()
+                            print(f"⏰ クールダウンタイマー更新: {self.detection_cooldown}秒待機開始")
                 
                 # 背景学習進行状況表示と学習処理
                 if self.race_ready and not self.race_active and self.preparation_start_time:
