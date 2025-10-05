@@ -560,8 +560,11 @@ class TeamsSimpleLaptimeSystemFixedV8:
         status_y = 400
         
         # レース状態
-        if self.race_active:
-            status_text = f"Racing (LAP{self.lap_count + 1})"
+        if self.race_complete:
+            status_text = "Finished"
+            status_color = self.colors['text_yellow']
+        elif self.race_active:
+            status_text = f"Qualifying Lap (LAP{self.current_lap_number})"
             status_color = self.colors['text_green']
         elif self.race_ready:
             status_text = "Ready for Start"
@@ -570,7 +573,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
             status_text = "Standby"
             status_color = self.colors['text_red']
         
-        status_surface = self.font_medium.render(f"System: {status_text}", True, status_color)
+        status_surface = self.font_medium.render(f"Status: {status_text}", True, status_color)
         self.screen.blit(status_surface, (450, status_y))
         
         # 最新検出状態
@@ -596,7 +599,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
                     self.stop_race()
                 elif event.key == pygame.K_SPACE:
                     # カメラなしモード用：手動検出シミュレーション
-                    if (self.race_ready or self.race_active) and not self.rescue_mode:
+                    if (self.race_ready or self.race_active) and not self.rescue_mode and not self.race_complete:
                         if self.camera_overview is None and self.camera_start_line is None:
                             print("🎮 手動検出シミュレーション実行")
                             self.process_detection()
@@ -644,11 +647,12 @@ class TeamsSimpleLaptimeSystemFixedV8:
                 if self.rescue_mode:
                     self.update_rescue_countdown()
                 
-                # 動き検出（スタートラインカメラで、またはカメラなしモードではスキップ）
+                # 動き検出（スタートラインカメラで、計測準備中またはレース中のみ）
                 if processed_sl is not None and self.bg_subtractor is not None:
-                    # 計測準備中または実行中のみ検出
-                    if (self.race_ready or self.race_active) and not self.rescue_mode:
+                    # 計測準備中またはレース中で、救済モードでない場合のみ検出
+                    if (self.race_ready or self.race_active) and not self.rescue_mode and not self.race_complete:
                         if self.detect_motion_v7(processed_sl):
+                            print("🔍 スタートラインで動き検出 - 処理実行")
                             self.process_detection()
                 
                 # UI描画

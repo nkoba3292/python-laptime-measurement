@@ -10,11 +10,11 @@
   "detection_settings": {
     "motion_pixels_threshold": 300,
     "min_contour_area": 200,
-    "motion_area_ratio_min": 0.008,
-    "motion_area_ratio_max": 0.9,
-    "stable_frames_required": 2,
-    "motion_consistency_check": false,
-    "detection_conditions_required": 2
+    "detection_conditions_required": 2,
+    "motion_area_ratio_min": 0.0001,
+    "motion_area_ratio_max": 0.3,
+    "stable_frames_required": 3,
+    "motion_consistency_check": true
   },
   "race_settings": {
     "max_laps": 3,
