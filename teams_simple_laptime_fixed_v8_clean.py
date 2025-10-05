@@ -195,7 +195,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
                 print(f"⚠️ Start line camera could not be opened")
                 self.camera_start_line = None
             
-            # 背景差分初期化
+            # 背景差分初期化（より安定した設定）
             self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
                 history=500, varThreshold=16, detectShadows=True
             )
@@ -241,7 +241,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
         print("🏁 計測準備完了！ローリングスタートモード")
         print("📋 待機中：スタートライン通過でTOTAL TIME計測開始")
         print("🔄 3周完了で自動的に計測終了・結果表示")
-        print("⏳ 背景学習中...短時間お待ちください")
+        print("⏳ 背景学習中...3秒お待ちください（重要）")
 
     def start_race(self):
         """レース開始（スタートライン通過時）"""
@@ -380,8 +380,10 @@ class TeamsSimpleLaptimeSystemFixedV8:
         
         # 1回目：計測準備中にスタートライン通過で計測開始
         if self.race_ready and not self.race_active:
-            # 背景学習時間を短縮（準備開始から1秒待機）
-            if self.preparation_start_time and (current_time - self.preparation_start_time) < 1.0:
+            # 背景学習時間を十分に確保（準備開始から3秒待機）
+            if self.preparation_start_time and (current_time - self.preparation_start_time) < 3.0:
+                learning_time = current_time - self.preparation_start_time
+                print(f"⏳ 背景学習中... {learning_time:.1f}/3.0秒")
                 return  # 背景学習中は検出しない
             
             print("🏁 背景学習完了 - 検出準備完了")
@@ -575,10 +577,10 @@ class TeamsSimpleLaptimeSystemFixedV8:
             self.screen.blit(control_surface, (20, controls_y + i * 25))
 
     def draw_status_info(self):
-        """システム状態表示"""
+        """システム状態表示（簡潔版）"""
         status_y = 400
         
-        # レース状態
+        # レース状態のみ表示
         if self.race_complete:
             status_text = "Finished"
             status_color = self.colors['text_yellow']
@@ -594,11 +596,6 @@ class TeamsSimpleLaptimeSystemFixedV8:
         
         status_surface = self.font_medium.render(f"Status: {status_text}", True, status_color)
         self.screen.blit(status_surface, (450, status_y))
-        
-        # 最新検出状態
-        detection_text = f"Motion: pixels={self.last_motion_pixels}, ratio={self.motion_area_ratio:.4f}"
-        detection_surface = self.font_small.render(detection_text, True, self.colors['text_white'])
-        self.screen.blit(detection_surface, (450, status_y + 40))
 
     def handle_events(self):
         """イベント処理"""
