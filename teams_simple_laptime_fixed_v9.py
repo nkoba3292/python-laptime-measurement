@@ -240,6 +240,13 @@ class TeamsSimpleLaptimeSystemFixedV9:
         self.preparation_start_time = time.time()  # 準備開始時刻を記録
         self._learning_completed = False  # 学習完了フラグをリセット
         
+        # 背景減算器を新しく初期化（前回の学習をクリア）
+        print("🔄 背景減算器を新規初期化中...")
+        self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
+            history=500, varThreshold=16, detectShadows=True
+        )
+        print("✅ 背景減算器初期化完了")
+        
         print("🏁 計測準備完了！ローリングスタートモード")
         print("📋 待機中：スタートライン通過でTOTAL TIME計測開始")
         print("🔄 3周完了で自動的に計測終了・結果表示")
@@ -682,6 +689,13 @@ class TeamsSimpleLaptimeSystemFixedV9:
                         # 学習専用でフレームを背景モデルに追加（検出は行わない）
                         gray = cv2.cvtColor(processed_sl, cv2.COLOR_BGR2GRAY) if len(processed_sl.shape) == 3 else processed_sl
                         _ = self.bg_subtractor.apply(gray, learningRate=0.1)  # 学習レート指定で安定した学習
+                        
+                        # デバッグ: 背景学習状況を確認
+                        if int(learning_time * 4) != getattr(self, '_debug_count', -1):  # 0.25秒ごと
+                            test_mask = self.bg_subtractor.apply(gray, learningRate=0)  # テスト用検出
+                            test_pixels = cv2.countNonZero(test_mask)
+                            print(f"🔍 学習中デバッグ: {learning_time:.1f}s - Motion pixels: {test_pixels}")
+                            self._debug_count = int(learning_time * 4)
                     
                     if learning_time < 3.0:
                         # 背景学習中の進行状況を定期的に表示（0.5秒ごと）
@@ -694,6 +708,12 @@ class TeamsSimpleLaptimeSystemFixedV9:
                             print("✅ 背景学習完了！")
                             print("🎯 動体検出準備完了 - スタートライン通過で計測開始")
                             print("-" * 50)
+                            # 学習完了後のテスト検出
+                            if processed_sl is not None and self.bg_subtractor is not None:
+                                gray = cv2.cvtColor(processed_sl, cv2.COLOR_BGR2GRAY) if len(processed_sl.shape) == 3 else processed_sl
+                                test_mask = self.bg_subtractor.apply(gray, learningRate=0)
+                                test_pixels = cv2.countNonZero(test_mask)
+                                print(f"🧪 学習完了後ベースライン: Motion pixels = {test_pixels}")
                             self._learning_completed = True  # 一度だけ表示
                 
                 # UI描画
