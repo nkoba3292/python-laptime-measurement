@@ -76,7 +76,6 @@ class TeamsSimpleLaptimeSystemFixedV10:
         
         # v7継承: 検出関連
         self.last_detection_time = 0
-        self.detection_cooldown = 2.5
         self.preparation_start_time = None  # 準備開始時刻
         self.last_motion_pixels = 0
         self.motion_history = []
@@ -317,15 +316,20 @@ class TeamsSimpleLaptimeSystemFixedV10:
         try:
             current_time = time.time()
             
-            # 背景学習期間中はクールダウンを無視（準備状態の場合）
+            # クールダウン期間チェック（背景学習中はスキップ）
             if not (self.race_ready and not self.race_active and self.preparation_start_time and 
-                    (current_time - self.preparation_start_time) < 3.0):
-                # 通常のクールダウン期間チェック
-                if current_time - self.last_detection_time < self.detection_cooldown:
+                    (current_time - self.preparation_start_time) < 5.0):  # 5秒学習期間
+                time_since_last = current_time - self.last_detection_time
+                if time_since_last < self.detection_cooldown:
+                    # 2周目以降のデバッグ情報を追加
+                    if self.race_active and time_since_last < self.detection_cooldown:
+                        print(f"⏱️ クールダウン中: {time_since_last:.1f}s / {self.detection_cooldown}s (LAP{self.current_lap_number})")
                     return False
             
+            # レース中は背景モデルを固定（learningRate=0）
+            learning_rate = 0.01 if (self.race_ready and not self.race_active) else 0
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            fg_mask = self.bg_subtractor.apply(gray)
+            fg_mask = self.bg_subtractor.apply(gray, learningRate=learning_rate)
             
             # ノイズ除去
             kernel = np.ones((3,3), np.uint8)
@@ -364,15 +368,20 @@ class TeamsSimpleLaptimeSystemFixedV10:
             self.motion_area_ratio = motion_ratio
             
             if motion_detected:
-                print(f"🔥 [v8/v7] Motion detected! Conditions: {conditions_met}/4")
+                lap_info = f"LAP{self.current_lap_number}" if self.race_active else "READY"
+                print(f"🔥 [{lap_info}] Motion detected! Conditions: {conditions_met}/4")
                 print(f"   - Motion pixels: {motion_pixels} (threshold: {self.motion_pixels_threshold})")
                 print(f"   - Max contour: {max_contour_area} (threshold: {self.min_contour_area})")
                 print(f"   - Motion ratio: {motion_ratio:.4f}")
                 print(f"   - Time since last detection: {current_time - self.last_detection_time:.2f}s")
+                print(f"   - Learning rate: {learning_rate}")
                 return True
             else:
+                # 2周目以降で検出失敗時の詳細情報
+                if self.race_active and self.current_lap_number >= 2:
+                    print(f"❌ [LAP{self.current_lap_number}] 検出失敗 - Motion:{motion_pixels}, Area:{max_contour_area:.0f}, Ratio:{motion_ratio:.4f}")
                 # デバッグ: 動きが検出されない理由を表示
-                if motion_pixels > 100:  # 最小限の動きがある場合のみ表示
+                elif motion_pixels > 100:  # 最小限の動きがある場合のみ表示
                     print(f"📊 [DEBUG] No motion: pixels={motion_pixels}/{self.motion_pixels_threshold}, "
                           f"contour={max_contour_area}/{self.min_contour_area}, ratio={motion_ratio:.4f}")
             
@@ -696,8 +705,14 @@ class TeamsSimpleLaptimeSystemFixedV10:
                     
                     # 学習完了後かつ、計測準備中またはレース中で、救済モードでない場合のみ検出
                     if learning_time >= 5.0 and (self.race_ready or self.race_active) and not self.rescue_mode and not self.race_complete:
+                        # 2周目以降の検出状況を詳しく監視
+                        if self.race_active and self.current_lap_number >= 2:
+                            time_since_last = time.time() - self.last_detection_time
+                            print(f"🔍 [LAP{self.current_lap_number}] 検出試行中 - 最終検出から{time_since_last:.1f}s経過")
+                        
                         if self.detect_motion_v7(processed_sl):
-                            print("🔍 スタートラインで動き検出 - 処理実行")
+                            lap_info = f"LAP{self.current_lap_number}" if self.race_active else "READY"
+                            print(f"🔍 [{lap_info}] スタートラインで動き検出 - 処理実行")
                             self.process_detection()
                 
                 # 背景学習進行状況表示と学習処理
