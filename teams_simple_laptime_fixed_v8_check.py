@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """
+<<<<<<< HEAD
 Teams共有用シンプル表示タイム計測システム (v8 - 3周計測対応版)
-- 3周分の個別ラップタイム表示 (LAP1/LAP2/LAP3/TOTAL)
+- 3周分の個別ラップタイム表示 (LAP1/                self.camera_start_line_id = config.get('camera_start_line_id', 0)AP2/LAP3/TOTAL)
 - ローリングスタートルール: Sキー押下後、スタートライン通過で計測開始
 - 3周完了で自動停止・結果表示
-- 救済システム: Rキーで5秒ペナルティ
 - 極限感度設定: 高精度検出でわずかな動きも捕捉
+=======
+Teams共有用シンプル表示タイム計測システム (v8 - 極限感度版)
+- 極限まで感度を向上：motion_pixels_threshold 100, min_contour_area 50
+- 単一条件でも満たせば検知する超敏感設定
+- 最小限の動きでも確実に反応する究極の感度設定
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
 """
 
 import pygame

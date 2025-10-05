@@ -8,20 +8,36 @@
     "frame_height": 480
   },
   "detection_settings": {
+<<<<<<< HEAD
     "motion_pixels_threshold": 300,
     "min_contour_area": 200,
     "detection_conditions_required": 2,
     "motion_area_ratio_min": 0.0001,
     "motion_area_ratio_max": 0.3,
     "stable_frames_required": 3,
+=======
+    "motion_pixels_threshold": 15000,
+    "min_contour_area": 1000,
+    "detection_conditions_required": 2,
+    "motion_area_ratio_min": 0.0001,
+    "motion_area_ratio_max": 0.3,
+    "stable_frames_required": 6,
+>>>>>>> c849082e6718e6c0ae7b2297b726e81bcf1b2eb2
     "motion_consistency_check": true
   },
   "race_settings": {
     "max_laps": 3,
+<<<<<<< HEAD
     "detection_cooldown": 2.5
   },
   "background_subtractor_settings": {
     "history": 30,
+=======
+    "detection_cooldown": 5.0
+  },
+  "background_subtractor_settings": {
+    "history": 10,
+>>>>>>> c849082e6718e6c0ae7b2297b726e81bcf1b2eb2
     "varThreshold": 16,
     "detectShadows": false
   }

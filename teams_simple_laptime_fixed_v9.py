@@ -243,11 +243,17 @@ class TeamsSimpleLaptimeSystemFixedV9:
         # 背景減算器を新しく初期化（前回の学習をクリア）
         print("🔄 背景減算器を新規初期化中...")
         self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
+<<<<<<< HEAD
             history=1000,        # より長い履歴で安定した学習
             varThreshold=25,     # より高い閾値でノイズ耐性向上
             detectShadows=True
         )
         print("✅ 背景減算器初期化完了（安定設定）")
+=======
+            history=500, varThreshold=16, detectShadows=True
+        )
+        print("✅ 背景減算器初期化完了")
+>>>>>>> c849082e6718e6c0ae7b2297b726e81bcf1b2eb2
         
         print("🏁 計測準備完了！ローリングスタートモード")
         print("📋 待機中：スタートライン通過でTOTAL TIME計測開始")
@@ -674,6 +680,7 @@ class TeamsSimpleLaptimeSystemFixedV9:
                     self.update_rescue_countdown()
                 
                 # 動き検出（スタートラインカメラで、計測準備中またはレース中のみ）
+<<<<<<< HEAD
                 # 重要：背景学習期間中は検出を完全に無効化
                 if processed_sl is not None and self.bg_subtractor is not None:
                     # 背景学習完了後のみ検出を実行
@@ -683,6 +690,11 @@ class TeamsSimpleLaptimeSystemFixedV9:
                     
                     # 学習完了後かつ、計測準備中またはレース中で、救済モードでない場合のみ検出
                     if learning_time >= 5.0 and (self.race_ready or self.race_active) and not self.rescue_mode and not self.race_complete:
+=======
+                if processed_sl is not None and self.bg_subtractor is not None:
+                    # 計測準備中またはレース中で、救済モードでない場合のみ検出
+                    if (self.race_ready or self.race_active) and not self.rescue_mode and not self.race_complete:
+>>>>>>> c849082e6718e6c0ae7b2297b726e81bcf1b2eb2
                         if self.detect_motion_v7(processed_sl):
                             print("🔍 スタートラインで動き検出 - 処理実行")
                             self.process_detection()
@@ -692,6 +704,7 @@ class TeamsSimpleLaptimeSystemFixedV9:
                     current_time = time.time()
                     learning_time = current_time - self.preparation_start_time
                     
+<<<<<<< HEAD
                     # 背景学習期間中は背景減算器に継続的にフレームを学習させる（5秒に延長）
                     if processed_sl is not None and self.bg_subtractor is not None and learning_time < 5.0:
                         # 学習専用でフレームを背景モデルに追加（検出は行わない）
@@ -699,6 +712,13 @@ class TeamsSimpleLaptimeSystemFixedV9:
                         
                         # より慎重な学習レート（0.01に下げる）
                         _ = self.bg_subtractor.apply(gray, learningRate=0.01)
+=======
+                    # 背景学習期間中は背景減算器に継続的にフレームを学習させる
+                    if processed_sl is not None and self.bg_subtractor is not None and learning_time < 3.0:
+                        # 学習専用でフレームを背景モデルに追加（検出は行わない）
+                        gray = cv2.cvtColor(processed_sl, cv2.COLOR_BGR2GRAY) if len(processed_sl.shape) == 3 else processed_sl
+                        _ = self.bg_subtractor.apply(gray, learningRate=0.1)  # 学習レート指定で安定した学習
+>>>>>>> c849082e6718e6c0ae7b2297b726e81bcf1b2eb2
                         
                         # デバッグ: 背景学習状況を確認
                         if int(learning_time * 4) != getattr(self, '_debug_count', -1):  # 0.25秒ごと
@@ -707,6 +727,7 @@ class TeamsSimpleLaptimeSystemFixedV9:
                             print(f"🔍 学習中デバッグ: {learning_time:.1f}s - Motion pixels: {test_pixels}")
                             self._debug_count = int(learning_time * 4)
                     
+<<<<<<< HEAD
                     if learning_time < 5.0:
                         # 背景学習中の進行状況を定期的に表示（0.5秒ごと）
                         if int(learning_time * 2) != getattr(self, '_last_progress_count', -1):
@@ -714,6 +735,15 @@ class TeamsSimpleLaptimeSystemFixedV9:
                             self._last_progress_count = int(learning_time * 2)
                     else:
                         # 5秒経過したら学習完了（計測開始はしない）
+=======
+                    if learning_time < 3.0:
+                        # 背景学習中の進行状況を定期的に表示（0.5秒ごと）
+                        if int(learning_time * 2) != getattr(self, '_last_progress_count', -1):
+                            print(f"⏳ 背景学習中... {learning_time:.1f}/3.0秒")
+                            self._last_progress_count = int(learning_time * 2)
+                    else:
+                        # 3秒経過したら学習完了（計測開始はしない）
+>>>>>>> c849082e6718e6c0ae7b2297b726e81bcf1b2eb2
                         if not getattr(self, '_learning_completed', False):
                             print("✅ 背景学習完了！")
                             print("🎯 動体検出準備完了 - スタートライン通過で計測開始")
