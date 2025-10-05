@@ -241,7 +241,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
         print("🏁 計測準備完了！ローリングスタートモード")
         print("📋 待機中：スタートライン通過でTOTAL TIME計測開始")
         print("🔄 3周完了で自動的に計測終了・結果表示")
-        print("⏳ 背景学習中...数秒お待ちください")
+        print("⏳ 背景学習中...短時間お待ちください")
 
     def start_race(self):
         """レース開始（スタートライン通過時）"""
@@ -305,9 +305,12 @@ class TeamsSimpleLaptimeSystemFixedV8:
         try:
             current_time = time.time()
             
-            # クールダウン期間チェック
-            if current_time - self.last_detection_time < self.detection_cooldown:
-                return False
+            # 背景学習期間中はクールダウンを無視（準備状態の場合）
+            if not (self.race_ready and not self.race_active and self.preparation_start_time and 
+                    (current_time - self.preparation_start_time) < 3.0):
+                # 通常のクールダウン期間チェック
+                if current_time - self.last_detection_time < self.detection_cooldown:
+                    return False
             
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             fg_mask = self.bg_subtractor.apply(gray)
@@ -353,7 +356,13 @@ class TeamsSimpleLaptimeSystemFixedV8:
                 print(f"   - Motion pixels: {motion_pixels} (threshold: {self.motion_pixels_threshold})")
                 print(f"   - Max contour: {max_contour_area} (threshold: {self.min_contour_area})")
                 print(f"   - Motion ratio: {motion_ratio:.4f}")
+                print(f"   - Time since last detection: {current_time - self.last_detection_time:.2f}s")
                 return True
+            else:
+                # デバッグ: 動きが検出されない理由を表示
+                if motion_pixels > 100:  # 最小限の動きがある場合のみ表示
+                    print(f"📊 [DEBUG] No motion: pixels={motion_pixels}/{self.motion_pixels_threshold}, "
+                          f"contour={max_contour_area}/{self.min_contour_area}, ratio={motion_ratio:.4f}")
             
             return False
             
@@ -371,10 +380,11 @@ class TeamsSimpleLaptimeSystemFixedV8:
         
         # 1回目：計測準備中にスタートライン通過で計測開始
         if self.race_ready and not self.race_active:
-            # 背景学習時間を確保（準備開始から3秒待機）
-            if self.preparation_start_time and (current_time - self.preparation_start_time) < 3.0:
+            # 背景学習時間を短縮（準備開始から1秒待機）
+            if self.preparation_start_time and (current_time - self.preparation_start_time) < 1.0:
                 return  # 背景学習中は検出しない
             
+            print("🏁 背景学習完了 - 検出準備完了")
             self.start_race()
             return
         
