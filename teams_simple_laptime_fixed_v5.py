@@ -84,9 +84,15 @@ class TeamsSimpleLaptimeSystemFixedV5:
                     "frame_height": 480
                 },
                 "detection_settings": {
+<<<<<<< HEAD
                     "motion_pixels_threshold": 600,      # 900→600に下げる（より敏感に）
                     "min_contour_area": 500,             # 1000→500に下げる（小さい動きも検知）
                     "motion_area_ratio_min": 0.015,      # 0.025→0.015に下げる（より小さい面積比でも検知）
+=======
+                    "motion_pixels_threshold": 900,      # v4:1500, v3:500
+                    "min_contour_area": 1000,           # v4:2000, v3:0
+                    "motion_area_ratio_min": 0.025,     # v4:0.05, v3:0.0
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
                     "motion_area_ratio_max": 0.8,
                     "stable_frames_required": 3,         # v4:5
                     "motion_consistency_check": True
@@ -222,7 +228,11 @@ class TeamsSimpleLaptimeSystemFixedV5:
         if motion_data['motion_pixels'] > 100:
             debug_info = f"検知評価: {conditions_met}/6 条件満足 | 動き: {motion_data['motion_pixels']} | 面積比: {motion_data['area_ratio']:.3f} | 輪郭: {motion_data['contour_count']}"
             print(debug_info)
+<<<<<<< HEAD
         if conditions_met >= 3:  # v4:5, v5:4→3条件以上で検知（さらに敏感に）
+=======
+        if conditions_met >= 4:  # v4:5, v5:4条件以上で検知
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
             self.last_detection_time = current_time
             print(f"🎯 車両検知成功: 条件クリア ({conditions_met}/6)")
             return True
@@ -372,7 +382,11 @@ class TeamsSimpleLaptimeSystemFixedV5:
         fps_text = f"FPS: {int(self.clock.get_fps())}"
         fps_surface = self.font_small.render(fps_text, True, self.colors['text_white'])
         self.screen.blit(fps_surface, (80, 670))
+<<<<<<< HEAD
         version_text = "v5 - Enhanced Sensitivity"
+=======
+        version_text = "v5 - Balanced Detection"
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
         version_surface = self.font_small.render(version_text, True, self.colors['text_yellow'])
         self.screen.blit(version_surface, (850, 670))
 
@@ -399,11 +413,19 @@ class TeamsSimpleLaptimeSystemFixedV5:
         print("🔄 左右反転修正: 有効 (cv2.flip適用)")
 
     def show_detection_settings(self):
+<<<<<<< HEAD
         print("🎯 検知設定 (v5バランス版 - 感度向上):")
         ds = self.config['detection_settings']
         print(f"  動きピクセル閾値: {ds['motion_pixels_threshold']} (感度向上)")
         print(f"  最小輪郭面積: {ds['min_contour_area']} (感度向上)")
         print(f"  面積比範囲: {ds['motion_area_ratio_min']:.3f} - {ds['motion_area_ratio_max']:.3f} (感度向上)")
+=======
+        print("🎯 検知設定 (v5バランス版):")
+        ds = self.config['detection_settings']
+        print(f"  動きピクセル閾値: {ds['motion_pixels_threshold']}")
+        print(f"  最小輪郭面積: {ds['min_contour_area']}")
+        print(f"  面積比範囲: {ds['motion_area_ratio_min']:.3f} - {ds['motion_area_ratio_max']:.3f}")
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
         print(f"  クールダウン: {self.detection_cooldown}秒")
         print(f"  直近動きピクセル: {self.last_motion_pixels}")
         print(f"  直近面積比: {self.motion_area_ratio:.3f}")
@@ -426,7 +448,11 @@ class TeamsSimpleLaptimeSystemFixedV5:
         print(f"📸 スクリーンショット保存: {filename}")
 
     def run(self):
+<<<<<<< HEAD
         print("🏁 Teams共有用シンプル表示タイム計測システム起動 (v5 - 物体検知感度向上版)")
+=======
+        print("🏁 Teams共有用シンプル表示タイム計測システム起動 (v5 - 物体検知感度バランス調整版)")
+>>>>>>> 62bc938e0014b1c05c884bb8ba69f934c8036058
         print("🎮 操作: R=リセット, Q/ESC=終了, T=タイム表示切替, S=スクリーンショット, C=カメラ情報, D=検知設定")
         if not self.initialize_cameras():
             print("❌ カメラ初期化失敗")
