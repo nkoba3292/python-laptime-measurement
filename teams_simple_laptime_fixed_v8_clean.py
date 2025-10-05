@@ -75,6 +75,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
         # v7継承: 検出関連
         self.last_detection_time = 0
         self.detection_cooldown = 2.5
+        self.preparation_start_time = None  # 準備開始時刻
         self.last_motion_pixels = 0
         self.motion_history = []
         self.stable_frame_count = 0
@@ -232,9 +233,15 @@ class TeamsSimpleLaptimeSystemFixedV8:
         self.rescue_mode = False
         self.rescue_countdown = 0
         self.total_penalty_time = 0.0
+        
+        # 重要：クールダウンタイマーをリセットして、背景学習時間を確保
+        self.last_detection_time = time.time()
+        self.preparation_start_time = time.time()  # 準備開始時刻を記録
+        
         print("🏁 計測準備完了！ローリングスタートモード")
         print("📋 待機中：スタートライン通過でTOTAL TIME計測開始")
         print("🔄 3周完了で自動的に計測終了・結果表示")
+        print("⏳ 背景学習中...数秒お待ちください")
 
     def start_race(self):
         """レース開始（スタートライン通過時）"""
@@ -364,6 +371,10 @@ class TeamsSimpleLaptimeSystemFixedV8:
         
         # 1回目：計測準備中にスタートライン通過で計測開始
         if self.race_ready and not self.race_active:
+            # 背景学習時間を確保（準備開始から3秒待機）
+            if self.preparation_start_time and (current_time - self.preparation_start_time) < 3.0:
+                return  # 背景学習中は検出しない
+            
             self.start_race()
             return
         
@@ -417,10 +428,8 @@ class TeamsSimpleLaptimeSystemFixedV8:
     def draw_camera_view(self, frame, x, y, width, height, title):
         """カメラ映像を描画"""
         if frame is not None:
-            # 左右反転を適用
-            frame_flipped = cv2.flip(frame, 1)
-            
-            frame_rgb = cv2.cvtColor(frame_flipped, cv2.COLOR_BGR2RGB)
+            # 左右反転を削除（正常な向きで表示）
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame_resized = cv2.resize(frame_rgb, (width, height))
             frame_surface = pygame.surfarray.make_surface(frame_resized.swapaxes(0, 1))
             
@@ -437,7 +446,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
             # カメラ映像
             self.screen.blit(frame_surface, (x, y))
             
-            return frame_flipped
+            return frame
         else:
             # カメラが利用できない場合
             panel_rect = pygame.Rect(x-10, y-40, width+20, height+60)
