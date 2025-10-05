@@ -390,8 +390,7 @@ class TeamsSimpleLaptimeSystemFixedV9:
             print("✅ 背景学習完了！")
             print("🎯 動体検出準備完了 - スタートライン通過で計測開始")
             print("-" * 50)
-            # 学習完了の明確化のため1秒待機
-            time.sleep(1.0)
+            # time.sleep削除: メインループをブロックしないよう修正
             self.start_race()
             return
         
