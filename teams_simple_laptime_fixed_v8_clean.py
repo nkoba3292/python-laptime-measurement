@@ -141,34 +141,58 @@ class TeamsSimpleLaptimeSystemFixedV8:
         self.detection_cooldown = race_settings["detection_cooldown"]
 
     def init_cameras(self):
-        """カメラ初期化"""
+        """カメラ初期化（ラズパイ対応・カメラなしモード対応）"""
         try:
+            print("📷 カメラを初期化中...")
+            
+            # カメラ0を試行
             self.camera_overview = cv2.VideoCapture(self.overview_camera_index)
             self.camera_start_line = cv2.VideoCapture(self.startline_camera_index)
             
-            if not self.camera_overview.isOpened():
-                print(f"⚠️ Overview camera (index {self.overview_camera_index}) could not be opened")
-                return False
-            if not self.camera_start_line.isOpened():
-                print(f"⚠️ Start line camera (index {self.startline_camera_index}) could not be opened")
-                return False
+            camera_available = False
             
-            # カメラ設定
-            self.camera_overview.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
-            self.camera_overview.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
-            self.camera_start_line.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
-            self.camera_start_line.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
+            if self.camera_overview.isOpened():
+                print(f"✅ Overview camera (index {self.overview_camera_index}) opened successfully")
+                camera_available = True
+                # カメラ設定
+                self.camera_overview.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
+                self.camera_overview.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
+            else:
+                print(f"⚠️ Overview camera (index {self.overview_camera_index}) could not be opened")
+                self.camera_overview = None
+            
+            if self.camera_start_line.isOpened():
+                print(f"✅ Start line camera (index {self.startline_camera_index}) opened successfully")
+                camera_available = True
+                # カメラ設定
+                self.camera_start_line.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
+                self.camera_start_line.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
+            else:
+                print(f"⚠️ Start line camera (index {self.startline_camera_index}) could not be opened")
+                self.camera_start_line = None
             
             # 背景差分初期化
             self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
                 history=500, varThreshold=16, detectShadows=True
             )
             
-            print("✅ カメラ初期化完了")
-            return True
+            if camera_available:
+                print("✅ カメラ初期化完了（一部カメラ利用可能）")
+            else:
+                print("⚠️ カメラなしモードで起動（デモモード）")
+                print("🎮 キーボードでテスト: Spaceキーで手動検出シミュレーション")
+            
+            return True  # カメラなしでも続行
+            
         except Exception as e:
-            print(f"❌ カメラ初期化エラー: {e}")
-            return False
+            print(f"⚠️ カメラ初期化警告: {e}")
+            print("📺 カメラなしモードで続行します")
+            self.camera_overview = None
+            self.camera_start_line = None
+            self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
+                history=500, varThreshold=16, detectShadows=True
+            )
+            return True  # カメラなしでも続行
 
     def prepare_race(self):
         """v8: 計測準備状態へ移行（Sキー押下時）"""
@@ -466,6 +490,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
             "R: Rescue Request (5s Penalty)",
             "Q: Race Stop", 
             "ESC: Exit",
+            "SPACE: Manual Detection (No Camera Mode)",
             "Start Line Pass = Start Race",
             "3 Laps = Auto Complete",
             "v8: 3-Lap System (v7 base)"
@@ -474,7 +499,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
         for i, control in enumerate(controls):
             if i < 3:
                 color = self.colors['text_green']
-            elif i < 5:
+            elif i < 6:
                 color = self.colors['text_yellow']
             else:
                 color = self.colors['text_red']
@@ -520,6 +545,12 @@ class TeamsSimpleLaptimeSystemFixedV8:
                         self.start_rescue()
                 elif event.key == pygame.K_q:
                     self.stop_race()
+                elif event.key == pygame.K_SPACE:
+                    # カメラなしモード用：手動検出シミュレーション
+                    if (self.race_ready or self.race_active) and not self.rescue_mode:
+                        if self.camera_overview is None and self.camera_start_line is None:
+                            print("🎮 手動検出シミュレーション実行")
+                            self.process_detection()
 
     def run(self):
         """メインループ"""
@@ -532,6 +563,8 @@ class TeamsSimpleLaptimeSystemFixedV8:
         print("📋 ローリングスタート: S押下後、スタートライン通過で計測開始")
         print("🆘 自走不能時: Rキーで救済申請（5秒ペナルティ）")
         print("🏁 3周完了で自動停止")
+        if self.camera_overview is None and self.camera_start_line is None:
+            print("🎮 カメラなしモード: Spaceキーで手動検出テスト")
         
         try:
             while self.running:
@@ -562,7 +595,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
                 if self.rescue_mode:
                     self.update_rescue_countdown()
                 
-                # 動き検出（スタートラインカメラで）
+                # 動き検出（スタートラインカメラで、またはカメラなしモードではスキップ）
                 if processed_sl is not None and self.bg_subtractor is not None:
                     # 計測準備中または実行中のみ検出
                     if (self.race_ready or self.race_active) and not self.rescue_mode:
