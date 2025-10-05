@@ -141,34 +141,55 @@ class TeamsSimpleLaptimeSystemFixedV8:
         self.detection_cooldown = race_settings["detection_cooldown"]
 
     def init_cameras(self):
-        """カメラ初期化（ラズパイ対応・カメラなしモード対応）"""
+        """カメラ初期化（ラズパイ対応・カメラなしモード対応・自動検出）"""
         try:
             print("📷 カメラを初期化中...")
             
-            # カメラ0を試行
-            self.camera_overview = cv2.VideoCapture(self.overview_camera_index)
-            self.camera_start_line = cv2.VideoCapture(self.startline_camera_index)
+            # 利用可能なカメラインデックスを自動検出
+            available_cameras = []
+            for i in range(4):  # 0-3まで試行
+                cap = cv2.VideoCapture(i)
+                if cap.isOpened():
+                    available_cameras.append(i)
+                    print(f"🔍 カメラインデックス {i} が利用可能")
+                cap.release()
+            
+            if not available_cameras:
+                print("⚠️ 利用可能なカメラが見つかりません")
+                self.camera_overview = None
+                self.camera_start_line = None
+            elif len(available_cameras) == 1:
+                # 1台のカメラのみ：両方の用途で共用
+                index = available_cameras[0]
+                print(f"📷 1台のカメラ（インデックス {index}）を両方の用途で使用")
+                self.camera_overview = cv2.VideoCapture(index)
+                self.camera_start_line = None  # 同じカメラは共用せず、1つだけ使用
+            else:
+                # 2台以上のカメラ：それぞれに割り当て
+                print(f"📷 {len(available_cameras)}台のカメラを検出：{available_cameras}")
+                self.camera_overview = cv2.VideoCapture(available_cameras[0])
+                self.camera_start_line = cv2.VideoCapture(available_cameras[1])
             
             camera_available = False
             
-            if self.camera_overview.isOpened():
-                print(f"✅ Overview camera (index {self.overview_camera_index}) opened successfully")
+            if self.camera_overview and self.camera_overview.isOpened():
+                print(f"✅ Overview camera (index {available_cameras[0] if available_cameras else 'N/A'}) opened successfully")
                 camera_available = True
                 # カメラ設定
                 self.camera_overview.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
                 self.camera_overview.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
             else:
-                print(f"⚠️ Overview camera (index {self.overview_camera_index}) could not be opened")
+                print(f"⚠️ Overview camera could not be opened")
                 self.camera_overview = None
             
-            if self.camera_start_line.isOpened():
-                print(f"✅ Start line camera (index {self.startline_camera_index}) opened successfully")
+            if self.camera_start_line and self.camera_start_line.isOpened():
+                print(f"✅ Start line camera (index {available_cameras[1] if len(available_cameras) > 1 else 'N/A'}) opened successfully")
                 camera_available = True
                 # カメラ設定
                 self.camera_start_line.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
                 self.camera_start_line.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
             else:
-                print(f"⚠️ Start line camera (index {self.startline_camera_index}) could not be opened")
+                print(f"⚠️ Start line camera could not be opened")
                 self.camera_start_line = None
             
             # 背景差分初期化
