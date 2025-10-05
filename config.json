@@ -21,8 +21,8 @@
     "detection_cooldown": 5.0
   },
   "background_subtractor_settings": {
-    "history": 10,
-    "varThreshold": 16,
-    "detectShadows": false
+    "history": 1000,
+    "varThreshold": 25,
+    "detectShadows": true
   }
 }

@@ -20,6 +20,7 @@ import os
 import sys
 
 pygame.init()
+pygame.font.init()  # フォント初期化を明示的に実行
 
 class TeamsSimpleLaptimeSystemFixedV10:
     def __init__(self):
@@ -238,11 +239,21 @@ class TeamsSimpleLaptimeSystemFixedV10:
         # 重要：クールダウンタイマーをリセットして、背景学習時間を確保
         self.last_detection_time = time.time()
         self.preparation_start_time = time.time()  # 準備開始時刻を記録
+        self._learning_completed = False  # 学習完了フラグをリセット
+        
+        # 背景減算器を新しく初期化（前回の学習をクリア）
+        print("🔄 背景減算器を新規初期化中...")
+        self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
+            history=1000,        # より長い履歴で安定した学習
+            varThreshold=25,     # より高い闾値でノイズ耐性向上
+            detectShadows=True
+        )
+        print("✅ 背景減算器初期化完了")
         
         print("🏁 計測準備完了！ローリングスタートモード")
         print("📋 待機中：スタートライン通過でTOTAL TIME計測開始")
         print("🔄 3周完了で自動的に計測終了・結果表示")
-        print("⏳ 背景学習中...3秒お待ちください（重要）")
+        print("⏳ 背景学習中...5秒お待ちください（重要）")
 
     def start_race(self):
         """レース開始（スタートライン通過時）"""
@@ -381,13 +392,24 @@ class TeamsSimpleLaptimeSystemFixedV10:
         
         # 1回目：計測準備中にスタートライン通過で計測開始
         if self.race_ready and not self.race_active:
-            # 背景学習時間を十分に確保（準備開始から3秒待機）
-            if self.preparation_start_time and (current_time - self.preparation_start_time) < 3.0:
+            # 背景学習時間を十分に確保（準備開始から5秒待機）
+            if self.preparation_start_time and (current_time - self.preparation_start_time) < 5.0:
                 learning_time = current_time - self.preparation_start_time
-                print(f"⏳ 背景学習中... {learning_time:.1f}/3.0秒")
+                print(f"⏳ 背景学習中... {learning_time:.1f}/5.0秒")
                 return  # 背景学習中は検出しない
+            elif not getattr(self, '_learning_completed', False):
+                print("✅ 背景学習完了！")
+                print("🎯 動体検出準備完了 - スタートライン通過で計測開始")
+                print("-" * 50)
+                # 学習完了後のテスト検出
+                if hasattr(self, 'start_line_roi') and self.start_line_roi is not None and self.bg_subtractor is not None:
+                    gray = cv2.cvtColor(self.start_line_roi, cv2.COLOR_BGR2GRAY) if len(self.start_line_roi.shape) == 3 else self.start_line_roi
+                    test_mask = self.bg_subtractor.apply(gray, learningRate=0)
+                    test_pixels = cv2.countNonZero(test_mask)
+                    print(f"🧪 学習完了後ベースライン: Motion pixels = {test_pixels}")
+                self._learning_completed = True  # 一度だけ表示
             
-            print("🏁 背景学習完了 - 検出準備完了")
+            print("🏁 レース計測開始 - スタートライン通過を検出")
             self.start_race()
             return
         
@@ -627,11 +649,12 @@ class TeamsSimpleLaptimeSystemFixedV10:
             print("❌ カメラの初期化に失敗しました")
             return
         
-        print("🚀 v8 3周計測システム開始")
+        print("🚀 v10 3周計測システム開始")
         print("📋 操作: S=計測準備, R=救済申請, Q=停止, ESC=終了")
         print("📋 ローリングスタート: S押下後、スタートライン通過で計測開始")
         print("🆘 自走不能時: Rキーで救済申請（5秒ペナルティ）")
         print("🏁 3周完了で自動停止")
+        print("⭐ v10改良点: 5秒背景学習＋検出分離＋MOG2最適化")
         if self.camera_overview is None and self.camera_start_line is None:
             print("🎮 カメラなしモード: Spaceキーで手動検出テスト")
         
@@ -664,13 +687,57 @@ class TeamsSimpleLaptimeSystemFixedV10:
                 if self.rescue_mode:
                     self.update_rescue_countdown()
                 
-                # 動き検出（スタートラインカメラで、計測準備中またはレース中のみ）
+                # 動き検出（背景学習完了後のみ実行）
                 if processed_sl is not None and self.bg_subtractor is not None:
-                    # 計測準備中またはレース中で、救済モードでない場合のみ検出
-                    if (self.race_ready or self.race_active) and not self.rescue_mode and not self.race_complete:
+                    # 背景学習の進行状況を計算
+                    learning_time = 0
+                    if self.race_ready and not self.race_active and self.preparation_start_time:
+                        learning_time = time.time() - self.preparation_start_time
+                    
+                    # 学習完了後かつ、計測準備中またはレース中で、救済モードでない場合のみ検出
+                    if learning_time >= 5.0 and (self.race_ready or self.race_active) and not self.rescue_mode and not self.race_complete:
                         if self.detect_motion_v7(processed_sl):
                             print("🔍 スタートラインで動き検出 - 処理実行")
                             self.process_detection()
+                
+                # 背景学習進行状況表示と学習処理
+                if self.race_ready and not self.race_active and self.preparation_start_time:
+                    current_time = time.time()
+                    learning_time = current_time - self.preparation_start_time
+                    
+                    # 背景学習期間中は背景減算器に継続的にフレームを学習させる（5秒に延長）
+                    if processed_sl is not None and self.bg_subtractor is not None and learning_time < 5.0:
+                        # 学習専用でフレームを背景モデルに追加（検出は行わない）
+                        gray = cv2.cvtColor(processed_sl, cv2.COLOR_BGR2GRAY) if len(processed_sl.shape) == 3 else processed_sl
+                        
+                        # より慎重な学習レート（0.01に下げる）
+                        _ = self.bg_subtractor.apply(gray, learningRate=0.01)
+                        
+                        # デバッグ: 背景学習状況を確認
+                        if int(learning_time * 4) != getattr(self, '_debug_count', -1):  # 0.25秒ごと
+                            test_mask = self.bg_subtractor.apply(gray, learningRate=0)  # テスト用検出
+                            test_pixels = cv2.countNonZero(test_mask)
+                            print(f"🔍 学習中デバッグ: {learning_time:.1f}s - Motion pixels: {test_pixels}")
+                            self._debug_count = int(learning_time * 4)
+                    
+                    if learning_time < 5.0:
+                        # 背景学習中の進行状況を定期的に表示（0.5秒ごと）
+                        if int(learning_time * 2) != getattr(self, '_last_progress_count', -1):
+                            print(f"⏳ 背景学習中... {learning_time:.1f}/5.0秒")
+                            self._last_progress_count = int(learning_time * 2)
+                    else:
+                        # 5秒経過したら学習完了（計測開始はしない）
+                        if not getattr(self, '_learning_completed', False):
+                            print("✅ 背景学習完了！")
+                            print("🎯 動体検出準備完了 - スタートライン通過で計測開始")
+                            print("-" * 50)
+                            # 学習完了後のテスト検出
+                            if processed_sl is not None and self.bg_subtractor is not None:
+                                gray = cv2.cvtColor(processed_sl, cv2.COLOR_BGR2GRAY) if len(processed_sl.shape) == 3 else processed_sl
+                                test_mask = self.bg_subtractor.apply(gray, learningRate=0)
+                                test_pixels = cv2.countNonZero(test_mask)
+                                print(f"🧪 学習完了後ベースライン: Motion pixels = {test_pixels}")
+                            self._learning_completed = True  # 一度だけ表示
                 
                 # UI描画
                 self.draw_lap_info()
