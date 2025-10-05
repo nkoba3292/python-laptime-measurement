@@ -53,10 +53,12 @@ class TeamsSimpleLaptimeSystemFixedV8:
         # v8: 3周計測システム状態管理
         self.race_ready = False  # S押し後の計測準備状態
         self.race_active = False  # 実際の計測開始状態
-        self.lap_count = 0
+        self.lap_count = 0  # 完了したラップ数
+        self.current_lap_number = 0  # 現在計測中のラップ番号
         self.current_lap_start = None
         self.race_start_time = None
         self.total_time = 0.0
+        self.current_lap_time = 0.0  # 現在のラップの進行時間
         
         # 3周計測用ラップタイム記録
         self.lap_times = [0.0, 0.0, 0.0]  # LAP1, LAP2, LAP3
@@ -216,13 +218,15 @@ class TeamsSimpleLaptimeSystemFixedV8:
             return True  # カメラなしでも続行
 
     def prepare_race(self):
-        """v8: 計測準備状態へ移行（Sキー押下時）"""
+        """計測準備状態へ移行（Sキー押下時）"""
         self.race_ready = True
         self.race_active = False
         self.lap_count = 0
+        self.current_lap_number = 0
         self.current_lap_start = None
         self.race_start_time = None
         self.total_time = 0.0
+        self.current_lap_time = 0.0
         self.lap_times = [0.0, 0.0, 0.0]
         self.race_complete = False
         self.rescue_mode = False
@@ -233,13 +237,14 @@ class TeamsSimpleLaptimeSystemFixedV8:
         print("🔄 3周完了で自動的に計測終了・結果表示")
 
     def start_race(self):
-        """v8: レース開始（スタートライン通過時）"""
+        """レース開始（スタートライン通過時）"""
         if self.race_ready and not self.race_active:
             self.race_active = True
             self.race_start_time = time.time()
             self.current_lap_start = self.race_start_time
+            self.current_lap_number = 1  # LAP1開始
             self.last_detection_time = self.race_start_time  # 初回検出時間をリセット
-            print("🏁 計測開始！LAP1 スタート")
+            print(f"🏁 計測開始！LAP{self.current_lap_number} スタート - TOTAL TIMEカウント開始")
 
     def stop_race(self):
         """v8: レース停止"""
@@ -315,20 +320,22 @@ class TeamsSimpleLaptimeSystemFixedV8:
             frame_area = gray.shape[0] * gray.shape[1]
             motion_ratio = motion_pixels / frame_area
             
-            conditions_met = 0
+            # v7高感度検出条件（安定版）
+            motion_detected = False
             
-            # 検出条件チェック
-            if motion_pixels > self.motion_pixels_threshold:
-                conditions_met += 1
-            if max_contour_area > self.min_contour_area:
-                conditions_met += 1
-            if self.motion_area_ratio_min <= motion_ratio <= self.motion_area_ratio_max:
-                conditions_met += 1
-            if len(contours) >= 1:
-                conditions_met += 1
+            # 基本的な動き検出条件
+            basic_motion = motion_pixels > self.motion_pixels_threshold and max_contour_area > self.min_contour_area
             
-            # v7: 2/4条件以上で検知（高感度）
-            motion_detected = conditions_met >= 2
+            # 面積比率チェック
+            area_ratio_ok = self.motion_area_ratio_min <= motion_ratio <= self.motion_area_ratio_max
+            
+            # 輪郭数チェック
+            contour_count_ok = len(contours) >= 1
+            
+            # 検出条件：基本動き + (面積比率 OR 輪郭数)
+            if basic_motion and (area_ratio_ok or contour_count_ok):
+                motion_detected = True
+                conditions_met = 2 + (1 if area_ratio_ok else 0) + (1 if contour_count_ok else 0)
             
             # デバッグ情報更新
             self.last_motion_pixels = motion_pixels
@@ -348,35 +355,39 @@ class TeamsSimpleLaptimeSystemFixedV8:
             return False
 
     def process_detection(self):
-        """v8: 検出処理とラップ計測"""
+        """検出処理とラップ計測（4回検出システム）"""
         current_time = time.time()
         
         # 救済モード中は検出処理をスキップ
         if self.rescue_mode:
             return
         
-        # 計測準備中にスタートライン通過で計測開始
+        # 1回目：計測準備中にスタートライン通過で計測開始
         if self.race_ready and not self.race_active:
             self.start_race()
             return
         
-        # レース中のラップ計測（3周完了後は処理停止）
+        # 2回目～4回目：レース中のラップ計測
         if self.race_active and not self.race_complete:
+            current_time = time.time()
+            
+            # 現在のラップ時間を記録してラップ完了
             if self.current_lap_start is not None:
                 lap_time = current_time - self.current_lap_start
-                self.lap_count += 1
                 
-                # 3周までのラップタイムを記録
-                if self.lap_count <= 3:
-                    self.lap_times[self.lap_count - 1] = lap_time
-                    print(f"⏱️ LAP{self.lap_count}: {self.format_time(lap_time)}")
+                # ラップ完了処理
+                if self.current_lap_number <= 3:
+                    self.lap_times[self.current_lap_number - 1] = lap_time
+                    self.lap_count += 1
+                    print(f"⏱️ LAP{self.current_lap_number}: {self.format_time(lap_time)} 完了")
                 
-                # 3周完了チェック（重要：ここでレース停止）
-                if self.lap_count >= 3:
-                    # 最終的な総時間を確定（3周目完了時点で停止）
+                # 3周完了チェック
+                if self.current_lap_number >= 3:
+                    # 4回目の検出 = 3周完了
                     self.total_time = current_time - self.race_start_time
                     self.race_complete = True
-                    self.race_active = False  # レース停止
+                    self.race_active = False
+                    self.current_lap_number = 0  # 計測終了
                     
                     print(f"🏁 3周完了！ 総時間: {self.format_time(self.total_time)}")
                     print("=== 最終結果 ===")
@@ -389,9 +400,10 @@ class TeamsSimpleLaptimeSystemFixedV8:
                         print(f"最終時間: {self.format_time(final_time)}")
                     return
                 
-                # 次のラップの開始時刻を設定（3周未満の場合のみ）
-                if self.lap_count < 3:
-                    self.current_lap_start = current_time
+                # 次のラップ開始
+                self.current_lap_number += 1
+                self.current_lap_start = current_time
+                print(f"🔄 LAP{self.current_lap_number} 開始")
                 
                 # 検出時間を更新
                 self.last_detection_time = current_time
@@ -476,29 +488,40 @@ class TeamsSimpleLaptimeSystemFixedV8:
         status = self.font_medium.render(f"Status: {status_text}", True, status_color)
         self.screen.blit(status, (info_x, info_y + 60))
         
-        # 3周分のラップタイム表示
+        # 3周分のラップタイム表示（改良版）
         y_offset = 100
         for i in range(3):
-            if self.lap_times[i] > 0:  # 記録済み
-                lap_text = f"LAP{i+1}: {self.format_time(self.lap_times[i])}"
+            lap_number = i + 1
+            
+            if self.lap_times[i] > 0:  # 完了済みラップ（ホールド表示）
+                lap_text = f"LAP{lap_number}: {self.format_time(self.lap_times[i])}"
                 color = self.colors['text_green']
-            else:  # 未記録
-                lap_text = f"LAP{i+1}: 00:00.000"
+            elif self.current_lap_number == lap_number:  # 現在進行中のラップ
+                if self.race_active and self.current_lap_start:
+                    current_lap_time = time.time() - self.current_lap_start
+                    lap_text = f"LAP{lap_number}: {self.format_time(current_lap_time)}"
+                    color = self.colors['text_yellow']
+                else:
+                    lap_text = f"LAP{lap_number}: 00:00.000"
+                    color = self.colors['text_white']
+            else:  # 未開始のラップ
+                lap_text = f"LAP{lap_number}: 00:00.000"
                 color = self.colors['text_white']
             
             lap_surface = self.font_medium.render(lap_text, True, color)
             self.screen.blit(lap_surface, (info_x, info_y + y_offset + i * 40))
         
-        # 総時間表示
+        # 総時間表示（修正版）
         if self.race_complete and self.total_time > 0:  # レース完了後は固定表示
             total_text = f"TOTAL: {self.format_time(self.total_time)}"
+            total_color = self.colors['text_yellow']
         elif self.race_active and self.race_start_time:  # レース中は動的表示
             total = time.time() - self.race_start_time
             total_text = f"TOTAL: {self.format_time(total)}"
-        else:
+            total_color = self.colors['text_white']
+        else:  # 準備状態または未開始（S押下時も含む）
             total_text = "TOTAL: 00:00.000"
-        
-        total_color = self.colors['text_yellow'] if self.lap_count >= 3 else self.colors['text_white']
+            total_color = self.colors['text_white']
         total_surface = self.font_medium.render(total_text, True, total_color)
         self.screen.blit(total_surface, (info_x, info_y + y_offset + 120))
         
