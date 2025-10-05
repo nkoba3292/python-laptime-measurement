@@ -387,15 +387,7 @@ class TeamsSimpleLaptimeSystemFixedV10:
                 print(f"⏳ 背景学習中... {learning_time:.1f}/3.0秒")
                 return  # 背景学習中は検出しない
             
-<<<<<<< HEAD
-            print("✅ 背景学習完了！")
-            print("🎯 動体検出準備完了 - スタートライン通過で計測開始")
-            print("-" * 50)
-            # 学習完了の明確化のため1秒待機
-            time.sleep(1.0)
-=======
             print("🏁 背景学習完了 - 検出準備完了")
->>>>>>> c849082e6718e6c0ae7b2297b726e81bcf1b2eb2
             self.start_race()
             return
         
@@ -706,8 +698,14 @@ class TeamsSimpleLaptimeSystemFixedV10:
         pygame.quit()
 
 def main():
-    system = TeamsSimpleLaptimeSystemFixedV8()
+    system = TeamsSimpleLaptimeSystemFixedV10()
     system.run()
 
 if __name__ == "__main__":
+    print("[v10 3-LAP SYSTEM] 初期化完了")
+    print("[v10] LAP1/LAP2/LAP3の3周計測システム")
+    print("[v10] ローリングスタート対応（Sキー準備→通過開始）")
+    print("[v10] 救済システム（Rキーで5秒ペナルティ）")
+    print("[v10] 背景学習最適化版（5秒学習期間＋検出分離）")
+    main()
     main()
