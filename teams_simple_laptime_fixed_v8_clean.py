@@ -228,8 +228,9 @@ class TeamsSimpleLaptimeSystemFixedV8:
         self.rescue_mode = False
         self.rescue_countdown = 0
         self.total_penalty_time = 0.0
-        print("🛠️ 計測準備完了！ローリングスタートでスタートラインを通過してください")
-        print("🏁 スタートライン通過で計測開始します")
+        print("🏁 計測準備完了！ローリングスタートモード")
+        print("📋 待機中：スタートライン通過でTOTAL TIME計測開始")
+        print("🔄 3周完了で自動的に計測終了・結果表示")
 
     def start_race(self):
         """v8: レース開始（スタートライン通過時）"""
@@ -359,7 +360,7 @@ class TeamsSimpleLaptimeSystemFixedV8:
             self.start_race()
             return
         
-        # レース中のラップ計測
+        # レース中のラップ計測（3周完了後は処理停止）
         if self.race_active and not self.race_complete:
             if self.current_lap_start is not None:
                 lap_time = current_time - self.current_lap_start
@@ -370,10 +371,13 @@ class TeamsSimpleLaptimeSystemFixedV8:
                     self.lap_times[self.lap_count - 1] = lap_time
                     print(f"⏱️ LAP{self.lap_count}: {self.format_time(lap_time)}")
                 
-                # 3周完了チェック
+                # 3周完了チェック（重要：ここでレース停止）
                 if self.lap_count >= 3:
+                    # 最終的な総時間を確定（3周目完了時点で停止）
                     self.total_time = current_time - self.race_start_time
                     self.race_complete = True
+                    self.race_active = False  # レース停止
+                    
                     print(f"🏁 3周完了！ 総時間: {self.format_time(self.total_time)}")
                     print("=== 最終結果 ===")
                     for i in range(3):
@@ -385,8 +389,9 @@ class TeamsSimpleLaptimeSystemFixedV8:
                         print(f"最終時間: {self.format_time(final_time)}")
                     return
                 
-                # 次のラップの開始時刻を設定
-                self.current_lap_start = current_time
+                # 次のラップの開始時刻を設定（3周未満の場合のみ）
+                if self.lap_count < 3:
+                    self.current_lap_start = current_time
                 
                 # 検出時間を更新
                 self.last_detection_time = current_time
@@ -485,11 +490,11 @@ class TeamsSimpleLaptimeSystemFixedV8:
             self.screen.blit(lap_surface, (info_x, info_y + y_offset + i * 40))
         
         # 総時間表示
-        if self.race_active and self.race_start_time:
+        if self.race_complete and self.total_time > 0:  # レース完了後は固定表示
+            total_text = f"TOTAL: {self.format_time(self.total_time)}"
+        elif self.race_active and self.race_start_time:  # レース中は動的表示
             total = time.time() - self.race_start_time
             total_text = f"TOTAL: {self.format_time(total)}"
-        elif self.total_time > 0:  # レース完了後
-            total_text = f"TOTAL: {self.format_time(self.total_time)}"
         else:
             total_text = "TOTAL: 00:00.000"
         
