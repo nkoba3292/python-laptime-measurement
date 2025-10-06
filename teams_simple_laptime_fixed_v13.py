@@ -85,6 +85,8 @@ class TeamsSimpleLaptimeSystemFixedV12:
         self.paused_lap_time = None  # 一時停止時のラップ経過時間
         self.paused_total_time = None  # 一時停止時の総経過時間
         self.total_pause_time = 0.0  # 総一時停止時間
+        self.pause_count = 0  # 一時停止回数
+        self.pause_count = 0  # 一時停止回数
         
         # v7継承: 検出関連
         self.last_detection_time = 0
@@ -246,6 +248,7 @@ class TeamsSimpleLaptimeSystemFixedV12:
         self.race_paused = False
         self.pause_countdown = 0
         self.total_pause_time = 0.0
+        self.pause_count = 0
         
         # 重要：クールダウンタイマーをリセットして、背景学習時間を確保
         self.last_detection_time = time.time()
@@ -295,6 +298,7 @@ class TeamsSimpleLaptimeSystemFixedV12:
             # 1回目Rキー：LAP・TOTALの時間計測（カウントアップ）を停止
             self.race_paused = True
             self.pause_start_time = time.time()
+            self.pause_count += 1  # 一時停止回数をインクリメント
             
             # 現在のラップ時間と総時間を保存（計測停止）
             if self.current_lap_start:
@@ -638,9 +642,9 @@ class TeamsSimpleLaptimeSystemFixedV12:
         total_surface = self.font_medium.render(total_text, True, total_color)
         self.screen.blit(total_surface, (info_x, info_y + y_offset + 120))
         
-        # 一時停止時間表示
-        if self.total_pause_time > 0:
-            pause_text = f"Pause Count: +{self.total_pause_time:.1f}s (Excluded)"
+        # 一時停止回数表示
+        if self.pause_count > 0:
+            pause_text = f"Pause Count: {self.pause_count}"
             pause_surface = self.font_small.render(pause_text, True, self.colors['text_yellow'])
             self.screen.blit(pause_surface, (info_x, info_y + y_offset + 160))
         
