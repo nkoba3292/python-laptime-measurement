@@ -130,7 +130,7 @@ class TeamsSimpleLaptimeSystemFixedV10:
                 },
                 "race_settings": {
                     "max_laps": 3,  # v8: 3周固定
-                    "detection_cooldown": 2.5
+                    "detection_cooldown": 5.0  # 誤検出防止のため延長
                 }
             }
             print("⚠️ config.json not found, using v8 3-lap system with v7 sensitivity settings")
@@ -338,8 +338,14 @@ class TeamsSimpleLaptimeSystemFixedV10:
                         print(f"⏱️ クールダウン中: {time_since_last:.1f}s / {self.detection_cooldown}s (LAP{self.current_lap_number})")
                     return False
             
-            # レース中は背景モデルを固定（learningRate=0）
-            learning_rate = 0.01 if (self.race_ready and not self.race_active) else 0
+            # 背景学習レート調整：準備中は高速学習、レース中は低速更新で誤検出防止
+            if self.race_ready and not self.race_active:
+                learning_rate = 0.01  # 準備中：高速学習
+            elif self.race_active:
+                learning_rate = 0.001  # レース中：微更新で誤検出防止
+            else:
+                learning_rate = 0.005  # その他：中程度更新
+            
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             fg_mask = self.bg_subtractor.apply(gray, learningRate=learning_rate)
             
@@ -370,10 +376,17 @@ class TeamsSimpleLaptimeSystemFixedV10:
             # 輪郭数チェック
             contour_count_ok = len(contours) >= 1
             
-            # 検出条件：基本動き + (面積比率 OR 輪郭数)
-            if basic_motion and (area_ratio_ok or contour_count_ok):
-                motion_detected = True
-                conditions_met = 2 + (1 if area_ratio_ok else 0) + (1 if contour_count_ok else 0)
+            # 検出条件：基本動き + 面積比率 + 輪郭数（レース中はより厳しく）
+            if self.race_active:
+                # レース中：より厳しい条件（AND条件）
+                if basic_motion and area_ratio_ok and contour_count_ok and len(contours) >= 2:
+                    motion_detected = True
+                    conditions_met = 4
+            else:
+                # 準備中：従来の条件（OR条件）
+                if basic_motion and (area_ratio_ok or contour_count_ok):
+                    motion_detected = True
+                    conditions_met = 2 + (1 if area_ratio_ok else 0) + (1 if contour_count_ok else 0)
             
             # デバッグ情報更新
             self.last_motion_pixels = motion_pixels
