@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Teams共有用シンプル表示タイム計測システム (v11 - デバッグ強化版)
-- v10ベース：5秒間の背景学習期間＋検出分離機能
+Teams共有用シンプル表示タイム計測システム (v11 - 一時停止機能付き)
+- v10ベース：安定した背景学習＋誤検出防止機能
 - 3周分の個別ラップタイム表示 (LAP1/LAP2/LAP3/TOTAL)
 - ローリングスタートルール: Sキー押下後、スタートライン通過で計測開始
 - 3周完了で自動停止・結果表示
-- 救済システム: Rキーで5秒ペナルティ
-- v11改良点: 1秒ごとmotion_pixels/contour詳細デバッグ出力機能追加
+- 一時停止システム: Rキーでレース一時停止/再開（5秒カウントダウン付き）
+- v11改良点: Rキーを一時停止/再開トグル機能に変更
 """
 
 import pygame
@@ -27,7 +27,7 @@ class TeamsSimpleLaptimeSystemFixedV11:
         self.screen_width = 1280
         self.screen_height = 720
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-        pygame.display.set_caption("🏁 Lap Timer v11 - デバッグ強化版")
+        pygame.display.set_caption("🏁 Lap Timer v11 - 一時停止機能付き")
         self.colors = {
             'background': (15, 15, 25),
             'text_white': (255, 255, 255),
@@ -78,20 +78,17 @@ class TeamsSimpleLaptimeSystemFixedV11:
         self.max_laps = 3  # 3周設定
         self.race_complete = False  # 3周完了フラグ
         
-        # 救済システム
-        self.rescue_mode = False  # 救済モードフラグ
-        self.rescue_countdown = 0  # 5秒カウントダウン
-        self.rescue_start_time = None  # 救済開始時刻
-        self.total_penalty_time = 0.0  # 総ペナルティ時間
-        self.rescue_paused_time = None  # 計測一時停止時の経過時間
+        # v11: 一時停止/再開システム（旧救済システムを拡張）
+        self.race_paused = False  # レース一時停止フラグ
+        self.pause_countdown = 0  # 5秒カウントダウン
+        self.pause_start_time = None  # 一時停止開始時刻
+        self.paused_lap_time = None  # 一時停止時のラップ経過時間
+        self.paused_total_time = None  # 一時停止時の総経過時間
+        self.total_pause_time = 0.0  # 総一時停止時間
         
         # v7継承: 検出関連
         self.last_detection_time = 0
         self.preparation_start_time = None  # 準備開始時刻
-        
-        # v11: デバッグタイマー（1秒ごと出力用）
-        self.last_debug_time = 0
-        self.debug_interval = 1.0  # 1秒間隔
         self.last_motion_pixels = 0
         self.motion_history = []
         self.stable_frame_count = 0
@@ -134,7 +131,7 @@ class TeamsSimpleLaptimeSystemFixedV11:
                 },
                 "race_settings": {
                     "max_laps": 3,  # v8: 3周固定
-                    "detection_cooldown": 2.5
+                    "detection_cooldown": 5.0  # 誤検出防止のため延長
                 }
             }
             print("⚠️ config.json not found, using v8 3-lap system with v7 sensitivity settings")
@@ -246,9 +243,9 @@ class TeamsSimpleLaptimeSystemFixedV11:
         self.current_lap_time = 0.0
         self.lap_times = [0.0, 0.0, 0.0]
         self.race_complete = False
-        self.rescue_mode = False
-        self.rescue_countdown = 0
-        self.total_penalty_time = 0.0
+        self.race_paused = False
+        self.pause_countdown = 0
+        self.total_pause_time = 0.0
         
         # 重要：クールダウンタイマーをリセットして、背景学習時間を確保
         self.last_detection_time = time.time()
@@ -273,6 +270,7 @@ class TeamsSimpleLaptimeSystemFixedV11:
         """レース開始（スタートライン通過時）"""
         if self.race_ready and not self.race_active:
             self.race_active = True
+            self.race_ready = False  # 重要：準備状態を解除してレース状態に移行
             self.race_start_time = time.time()
             self.current_lap_start = self.race_start_time
             self.current_lap_number = 1  # LAP1開始
@@ -284,47 +282,65 @@ class TeamsSimpleLaptimeSystemFixedV11:
         self.race_ready = False
         self.race_active = False
         self.race_complete = False
-        self.rescue_mode = False
-        self.rescue_countdown = 0
+        self.race_paused = False
+        self.pause_countdown = 0
         print("⏹️ 計測停止")
 
-    def start_rescue(self):
-        """v8: 救済申請開始"""
-        if self.race_active and not self.rescue_mode:
-            self.rescue_mode = True
-            self.rescue_countdown = 5.0
-            self.rescue_start_time = time.time()
+    def toggle_pause(self):
+        """v11: レース一時停止/再開トグル"""
+        if not self.race_active:
+            return  # レース中でない場合は何もしない
+        
+        if not self.race_paused:
+            # 一時停止開始
+            self.race_paused = True
+            self.pause_start_time = time.time()
             
-            # 現在のラップ時間を一時保存
+            # 現在のラップ時間と総時間を保存
             if self.current_lap_start:
-                self.rescue_paused_time = time.time() - self.current_lap_start
+                self.paused_lap_time = time.time() - self.current_lap_start
+            if self.race_start_time:
+                self.paused_total_time = time.time() - self.race_start_time
             
-            print("🆘 救済申請！5秒ペナルティ開始")
-            print("⏳ 5秒間その場で待機してください")
+            print("⏸️ レース一時停止！")
+            print("🔄 Rキーで再開（その後5秒カウントダウン）")
+        else:
+            # 再開準備：5秒カウントダウン開始
+            self.pause_countdown = 5.0
+            self.pause_start_time = time.time()  # カウントダウン開始時刻
+            print("🔄 レース再開準備！5秒カウントダウン")
+            print("⏳ 5秒後に計測再開します")
 
-    def update_rescue_countdown(self):
-        """v8: 救済カウントダウン更新"""
-        if self.rescue_mode and self.rescue_countdown > 0:
+    def update_pause_countdown(self):
+        """v11: 一時停止カウントダウン更新"""
+        if self.race_paused and self.pause_countdown > 0:
             current_time = time.time()
-            elapsed = current_time - self.rescue_start_time
+            elapsed = current_time - self.pause_start_time
             remaining = 5.0 - elapsed
             
             if remaining <= 0:
-                # 救済完了
-                self.rescue_mode = False
-                self.rescue_countdown = 0
-                self.total_penalty_time += 5.0
+                # カウントダウン完了：レース再開
+                pause_duration = current_time - self.pause_start_time
+                self.total_pause_time += pause_duration
                 
-                # 計測再開
-                if self.current_lap_start and self.rescue_paused_time:
-                    # ペナルティ時間を加算して計測再開
-                    self.current_lap_start = time.time() - self.rescue_paused_time
+                # レース再開
+                self.race_paused = False
+                self.pause_countdown = 0
                 
-                print("✅ 救済完了！計測再開")
-                print(f"📊 総ペナルティ時間: {self.total_penalty_time:.1f}秒")
-                self.rescue_paused_time = None
+                # ラップ時間と総時間を再計算
+                if self.paused_lap_time is not None:
+                    self.current_lap_start = current_time - self.paused_lap_time
+                if self.paused_total_time is not None:
+                    self.race_start_time = current_time - self.paused_total_time
+                
+                print("✅ レース再開！計測継続")
+                print(f"📊 総一時停止時間: {self.total_pause_time:.1f}秒")
+                
+                # 一時変数をクリア
+                self.paused_lap_time = None
+                self.paused_total_time = None
             else:
-                self.rescue_countdown = remaining
+                self.pause_countdown = remaining
 
     def detect_motion_v7(self, frame):
         """v7継承: 高感度動き検出"""
@@ -341,8 +357,14 @@ class TeamsSimpleLaptimeSystemFixedV11:
                         print(f"⏱️ クールダウン中: {time_since_last:.1f}s / {self.detection_cooldown}s (LAP{self.current_lap_number})")
                     return False
             
-            # レース中は背景モデルを固定（learningRate=0）
-            learning_rate = 0.01 if (self.race_ready and not self.race_active) else 0
+            # 背景学習レート調整：準備中は高速学習、レース中は低速更新で誤検出防止
+            if self.race_ready and not self.race_active:
+                learning_rate = 0.01  # 準備中：高速学習
+            elif self.race_active:
+                learning_rate = 0.001  # レース中：微更新で誤検出防止
+            else:
+                learning_rate = 0.005  # その他：中程度更新
+            
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             fg_mask = self.bg_subtractor.apply(gray, learningRate=learning_rate)
             
@@ -358,25 +380,8 @@ class TeamsSimpleLaptimeSystemFixedV11:
             motion_pixels = cv2.countNonZero(fg_mask)
             max_contour_area = max([cv2.contourArea(c) for c in contours]) if contours else 0
             
-            # motion_ratioを先に計算（デバッグ出力で使用するため）
             frame_area = gray.shape[0] * gray.shape[1]
             motion_ratio = motion_pixels / frame_area
-            
-            # v11: 1秒ごと詳細デバッグ出力
-            if current_time - self.last_debug_time >= self.debug_interval:
-                race_state = "READY" if self.race_ready and not self.race_active else f"LAP{self.current_lap_number}" if self.race_active else "IDLE"
-                contour_areas = [cv2.contourArea(c) for c in contours] if contours else []
-                contour_count = len(contours)
-                
-                print(f"🔍 [v11-DEBUG] {race_state} | Time: {current_time:.1f}s")
-                print(f"   📊 Motion Pixels: {motion_pixels} (threshold: {self.motion_pixels_threshold})")
-                print(f"   📐 Max Contour Area: {max_contour_area:.1f} (threshold: {self.min_contour_area})")
-                print(f"   🔢 Contour Count: {contour_count} | Areas: {contour_areas[:5]}")  # 最初の5個のみ表示
-                print(f"   📈 Motion Ratio: {motion_ratio:.4f} (range: {self.motion_area_ratio_min}-{self.motion_area_ratio_max})")
-                print(f"   ⏰ Since Last Detection: {current_time - self.last_detection_time:.1f}s")
-                print(f"   -" * 60)
-                
-                self.last_debug_time = current_time
             
             # v7高感度検出条件（安定版）
             motion_detected = False
@@ -390,10 +395,17 @@ class TeamsSimpleLaptimeSystemFixedV11:
             # 輪郭数チェック
             contour_count_ok = len(contours) >= 1
             
-            # 検出条件：基本動き + (面積比率 OR 輪郭数)
-            if basic_motion and (area_ratio_ok or contour_count_ok):
-                motion_detected = True
-                conditions_met = 2 + (1 if area_ratio_ok else 0) + (1 if contour_count_ok else 0)
+            # 検出条件：基本動き + 面積比率 + 輪郭数（レース中はより厳しく）
+            if self.race_active:
+                # レース中：より厳しい条件（AND条件）
+                if basic_motion and area_ratio_ok and contour_count_ok and len(contours) >= 2:
+                    motion_detected = True
+                    conditions_met = 4
+            else:
+                # 準備中：従来の条件（OR条件）
+                if basic_motion and (area_ratio_ok or contour_count_ok):
+                    motion_detected = True
+                    conditions_met = 2 + (1 if area_ratio_ok else 0) + (1 if contour_count_ok else 0)
             
             # デバッグ情報更新
             self.last_motion_pixels = motion_pixels
@@ -401,14 +413,12 @@ class TeamsSimpleLaptimeSystemFixedV11:
             
             if motion_detected:
                 lap_info = f"LAP{self.current_lap_number}" if self.race_active else "READY"
-                print(f"🔥 [v11-DETECTION] {lap_info} Motion detected! Conditions: {conditions_met}/4")
-                print(f"   ✅ Motion pixels: {motion_pixels} > {self.motion_pixels_threshold}")
-                print(f"   ✅ Max contour: {max_contour_area:.1f} > {self.min_contour_area}")
-                print(f"   📊 Motion ratio: {motion_ratio:.4f} (range: {self.motion_area_ratio_min}-{self.motion_area_ratio_max})")
-                print(f"   🔢 Contour count: {len(contours)} | Areas: {[round(cv2.contourArea(c), 1) for c in contours[:3]]}")
-                print(f"   ⏰ Time since last detection: {current_time - self.last_detection_time:.2f}s")
-                print(f"   🧠 Learning rate: {learning_rate}")
-                print(f"   " + "="*70)
+                print(f"🔥 [{lap_info}] Motion detected! Conditions: {conditions_met}/4")
+                print(f"   - Motion pixels: {motion_pixels} (threshold: {self.motion_pixels_threshold})")
+                print(f"   - Max contour: {max_contour_area} (threshold: {self.min_contour_area})")
+                print(f"   - Motion ratio: {motion_ratio:.4f}")
+                print(f"   - Time since last detection: {current_time - self.last_detection_time:.2f}s")
+                print(f"   - Learning rate: {learning_rate}")
                 return True
             else:
                 # 2周目以降で検出失敗時の詳細情報
@@ -429,8 +439,8 @@ class TeamsSimpleLaptimeSystemFixedV11:
         """検出処理とラップ計測（4回検出システム）"""
         current_time = time.time()
         
-        # 救済モード中は検出処理をスキップ
-        if self.rescue_mode:
+        # 一時停止中は検出処理をスキップ
+        if self.race_paused:
             return
         
         # 1回目：計測準備中にスタートライン通過で計測開始
@@ -483,9 +493,9 @@ class TeamsSimpleLaptimeSystemFixedV11:
                     for i in range(3):
                         print(f"LAP{i+1}: {self.format_time(self.lap_times[i])}")
                     print(f"TOTAL: {self.format_time(self.total_time)}")
-                    if self.total_penalty_time > 0:
-                        final_time = self.total_time + self.total_penalty_time
-                        print(f"ペナルティ: +{self.total_penalty_time:.1f}秒")
+                    if self.total_pause_time > 0:
+                        final_time = self.total_time + self.total_pause_time
+                        print(f"一時停止: +{self.total_pause_time:.1f}秒")
                         print(f"最終時間: {self.format_time(final_time)}")
                     return
                 
@@ -558,8 +568,11 @@ class TeamsSimpleLaptimeSystemFixedV11:
         if self.race_complete:
             status_text = "Finished"
             status_color = self.colors['text_yellow']
-        elif self.rescue_mode:
-            status_text = f"Rescue ({self.rescue_countdown:.1f}s)"
+        elif self.race_paused:
+            if self.pause_countdown > 0:
+                status_text = f"Resuming ({self.pause_countdown:.1f}s)"
+            else:
+                status_text = "Paused"
             status_color = self.colors['text_red']
         elif self.race_active:
             status_text = f"Qualifying Lap (LAP{self.current_lap_number})"
@@ -611,18 +624,18 @@ class TeamsSimpleLaptimeSystemFixedV11:
         total_surface = self.font_medium.render(total_text, True, total_color)
         self.screen.blit(total_surface, (info_x, info_y + y_offset + 120))
         
-        # ペナルティ時間表示
-        if self.total_penalty_time > 0:
-            penalty_text = f"Penalty: +{self.total_penalty_time:.1f}s"
-            penalty_surface = self.font_small.render(penalty_text, True, self.colors['text_red'])
-            self.screen.blit(penalty_surface, (info_x, info_y + y_offset + 160))
+        # 一時停止時間表示
+        if self.total_pause_time > 0:
+            pause_text = f"Pause Time: +{self.total_pause_time:.1f}s"
+            pause_surface = self.font_small.render(pause_text, True, self.colors['text_yellow'])
+            self.screen.blit(pause_surface, (info_x, info_y + y_offset + 160))
 
     def draw_controls(self):
         """操作方法表示"""
         controls_y = 550
         controls = [
             "S: Race Prepare (Rolling Start)",
-            "R: Rescue Request (5s Penalty)",
+            "R: Pause/Resume (Toggle)",
             "Q: Race Stop", 
             "ESC: Exit",
             "SPACE: Manual Detection (No Camera Mode)",
@@ -674,13 +687,13 @@ class TeamsSimpleLaptimeSystemFixedV11:
                     if not self.race_ready and not self.race_active:
                         self.prepare_race()
                 elif event.key == pygame.K_r:
-                    if self.race_active and not self.rescue_mode:
-                        self.start_rescue()
+                    if self.race_active:
+                        self.toggle_pause()
                 elif event.key == pygame.K_q:
                     self.stop_race()
                 elif event.key == pygame.K_SPACE:
                     # カメラなしモード用：手動検出シミュレーション
-                    if (self.race_ready or self.race_active) and not self.rescue_mode and not self.race_complete:
+                    if (self.race_ready or self.race_active) and not self.race_paused and not self.race_complete:
                         if self.camera_overview is None and self.camera_start_line is None:
                             print("🎮 手動検出シミュレーション実行")
                             self.process_detection()
@@ -691,13 +704,12 @@ class TeamsSimpleLaptimeSystemFixedV11:
             print("❌ カメラの初期化に失敗しました")
             return
         
-        print("🚀 v11 3周計測システム開始")
+        print("🚀 v10 3周計測システム開始")
         print("📋 操作: S=計測準備, R=救済申請, Q=停止, ESC=終了")
         print("📋 ローリングスタート: S押下後、スタートライン通過で計測開始")
         print("🆘 自走不能時: Rキーで救済申請（5秒ペナルティ）")
         print("🏁 3周完了で自動停止")
-        print("🔍 v11デバッグ強化: 1秒ごとmotion_pixels/contour詳細出力")
-        print("📊 デバッグ情報でタイミング・感度を詳細分析可能")
+        print("⭐ v10改良点: 5秒背景学習＋検出分離＋MOG2最適化")
         if self.camera_overview is None and self.camera_start_line is None:
             print("🎮 カメラなしモード: Spaceキーで手動検出テスト")
         
@@ -726,9 +738,9 @@ class TeamsSimpleLaptimeSystemFixedV11:
                 processed_ov = self.draw_camera_view(frame_ov, 30, 80, 375, 280, "Overview Camera")
                 processed_sl = self.draw_camera_view(frame_sl, 430, 80, 375, 280, "Start Line Camera")
                 
-                # 救済カウントダウン更新
-                if self.rescue_mode:
-                    self.update_rescue_countdown()
+                # 一時停止カウントダウン更新
+                if self.race_paused:
+                    self.update_pause_countdown()
                 
                 # 動き検出（背景学習完了後のみ実行）
                 if processed_sl is not None and self.bg_subtractor is not None:
@@ -738,7 +750,14 @@ class TeamsSimpleLaptimeSystemFixedV11:
                         learning_time = time.time() - self.preparation_start_time
                     
                     # 学習完了後かつ、計測準備中またはレース中で、救済モードでない場合のみ検出
-                    if learning_time >= 5.0 and (self.race_ready or self.race_active) and not self.rescue_mode and not self.race_complete:
+                    # レース中は learning_time チェックをスキップ
+                    detection_ready = False
+                    if self.race_active:  # レース中は常に検出可能
+                        detection_ready = True
+                    elif self.race_ready and not self.race_active:  # 準備中は学習完了後のみ
+                        detection_ready = learning_time >= 5.0
+                    
+                    if detection_ready and not self.race_paused and not self.race_complete:
                         # 2周目以降の検出状況を詳しく監視
                         if self.race_active and self.current_lap_number >= 2:
                             time_since_last = time.time() - self.last_detection_time
@@ -824,6 +843,6 @@ if __name__ == "__main__":
     print("[v11 3-LAP SYSTEM] 初期化完了")
     print("[v11] LAP1/LAP2/LAP3の3周計測システム")
     print("[v11] ローリングスタート対応（Sキー準備→通過開始）")
-    print("[v11] 救済システム（Rキーで5秒ペナルティ）")
-    print("[v11] デバッグ強化版（1秒ごとmotion_pixels/contour詳細出力）")
+    print("[v11] 一時停止システム（Rキーで一時停止/再開）")
+    print("[v11] 一時停止機能付き（v10安定版ベース）")
     main()
