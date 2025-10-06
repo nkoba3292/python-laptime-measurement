@@ -596,7 +596,12 @@ class TeamsSimpleLaptimeSystemFixedV12:
                 color = self.colors['text_green']
             elif self.current_lap_number == lap_number:  # 現在進行中のラップ
                 if self.race_active and self.current_lap_start:
-                    current_lap_time = time.time() - self.current_lap_start
+                    if self.race_paused and self.paused_lap_time is not None:
+                        # 一時停止中：保存された時間を表示（カウント停止）
+                        current_lap_time = self.paused_lap_time
+                    else:
+                        # 通常時：リアルタイム計算
+                        current_lap_time = time.time() - self.current_lap_start
                     lap_text = f"LAP{lap_number}: {self.format_time(current_lap_time)}"
                     color = self.colors['text_yellow']
                 else:
@@ -609,12 +614,17 @@ class TeamsSimpleLaptimeSystemFixedV12:
             lap_surface = self.font_medium.render(lap_text, True, color)
             self.screen.blit(lap_surface, (info_x, info_y + y_offset + i * 40))
         
-        # 総時間表示（修正版）
+        # 総時間表示（一時停止対応版）
         if self.race_complete and self.total_time > 0:  # レース完了後は固定表示
             total_text = f"TOTAL: {self.format_time(self.total_time)}"
             total_color = self.colors['text_yellow']
         elif self.race_active and self.race_start_time:  # レース中は動的表示
-            total = time.time() - self.race_start_time
+            if self.race_paused and self.paused_total_time is not None:
+                # 一時停止中：保存された時間を表示（カウント停止）
+                total = self.paused_total_time
+            else:
+                # 通常時：リアルタイム計算
+                total = time.time() - self.race_start_time
             total_text = f"TOTAL: {self.format_time(total)}"
             total_color = self.colors['text_white']
         else:  # 準備状態または未開始（S押下時も含む）
@@ -625,9 +635,18 @@ class TeamsSimpleLaptimeSystemFixedV12:
         
         # 一時停止時間表示
         if self.total_pause_time > 0:
-            pause_text = f"Pause Time: +{self.total_pause_time:.1f}s"
+            pause_text = f"Pause Time: +{self.total_pause_time:.1f}s (Excluded)"
             pause_surface = self.font_small.render(pause_text, True, self.colors['text_yellow'])
             self.screen.blit(pause_surface, (info_x, info_y + y_offset + 160))
+        
+        # 一時停止状態の追加表示
+        if self.race_paused:
+            if self.pause_countdown > 0:
+                pause_status = f"⏳ Resuming in {self.pause_countdown:.1f}s"
+            else:
+                pause_status = "⏸️ LAP/TOTAL Count STOPPED"
+            pause_status_surface = self.font_small.render(pause_status, True, self.colors['text_red'])
+            self.screen.blit(pause_status_surface, (info_x, info_y + y_offset + 180))
 
     def draw_controls(self):
         """操作方法表示"""
