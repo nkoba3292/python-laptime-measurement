@@ -269,6 +269,7 @@ class TeamsSimpleLaptimeSystemFixedV10:
         """レース開始（スタートライン通過時）"""
         if self.race_ready and not self.race_active:
             self.race_active = True
+            self.race_ready = False  # 重要：準備状態を解除してレース状態に移行
             self.race_start_time = time.time()
             self.current_lap_start = self.race_start_time
             self.current_lap_number = 1  # LAP1開始
@@ -714,7 +715,14 @@ class TeamsSimpleLaptimeSystemFixedV10:
                         learning_time = time.time() - self.preparation_start_time
                     
                     # 学習完了後かつ、計測準備中またはレース中で、救済モードでない場合のみ検出
-                    if learning_time >= 5.0 and (self.race_ready or self.race_active) and not self.rescue_mode and not self.race_complete:
+                    # レース中は learning_time チェックをスキップ
+                    detection_ready = False
+                    if self.race_active:  # レース中は常に検出可能
+                        detection_ready = True
+                    elif self.race_ready and not self.race_active:  # 準備中は学習完了後のみ
+                        detection_ready = learning_time >= 5.0
+                    
+                    if detection_ready and not self.rescue_mode and not self.race_complete:
                         # 2周目以降の検出状況を詳しく監視
                         if self.race_active and self.current_lap_number >= 2:
                             time_since_last = time.time() - self.last_detection_time
