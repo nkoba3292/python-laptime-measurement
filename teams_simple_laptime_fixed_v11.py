@@ -358,6 +358,10 @@ class TeamsSimpleLaptimeSystemFixedV11:
             motion_pixels = cv2.countNonZero(fg_mask)
             max_contour_area = max([cv2.contourArea(c) for c in contours]) if contours else 0
             
+            # motion_ratioを先に計算（デバッグ出力で使用するため）
+            frame_area = gray.shape[0] * gray.shape[1]
+            motion_ratio = motion_pixels / frame_area
+            
             # v11: 1秒ごと詳細デバッグ出力
             if current_time - self.last_debug_time >= self.debug_interval:
                 race_state = "READY" if self.race_ready and not self.race_active else f"LAP{self.current_lap_number}" if self.race_active else "IDLE"
@@ -373,9 +377,6 @@ class TeamsSimpleLaptimeSystemFixedV11:
                 print(f"   -" * 60)
                 
                 self.last_debug_time = current_time
-            
-            frame_area = gray.shape[0] * gray.shape[1]
-            motion_ratio = motion_pixels / frame_area
             
             # v7高感度検出条件（安定版）
             motion_detected = False
