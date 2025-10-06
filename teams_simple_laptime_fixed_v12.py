@@ -305,39 +305,44 @@ class TeamsSimpleLaptimeSystemFixedV12:
             print("⏸️ LAP・TOTAL時間計測停止")
             print("🔄 次のRキーでLAP・TOTAL計測再開 + 5秒カウントダウン表示")
         else:
-            # 2回目Rキー：LAP・TOTAL計測を再開して5秒カウントダウン表示
+            # 2回目Rキー：カウントダウン表示開始と同時にLAP・TOTAL計測を再開
+            current_time = time.time()
+            
+            # 一時停止時間を計算して累積
+            pause_duration = current_time - self.pause_start_time
+            self.total_pause_time += pause_duration
+            
+            # ラップ時間と総時間を即座再計算（一時停止分を除外して復元）
+            if self.paused_lap_time is not None:
+                self.current_lap_start = current_time - self.paused_lap_time
+            if self.paused_total_time is not None:
+                self.race_start_time = current_time - self.paused_total_time
+            
+            # 5秒カウントダウン表示を開始（カウントアップは即座再開）
             self.pause_countdown = 5.0
-            self.pause_start_time = time.time()  # カウントダウン開始時刻
+            self.pause_start_time = current_time  # カウントダウン開始時刻
+            
             print("▶️ LAP・TOTAL計測再開！5秒カウントダウン表示開始")
-            print("⏳ 5秒間カウントダウンを表示します")
+            print("⏳ カウントアップとカウントダウンを同時実行中")
+            print(f"📊 総一時停止時間: {self.total_pause_time:.1f}秒（計測から除外）")
+            
+            # 一時変数をクリア
+            self.paused_lap_time = None
+            self.paused_total_time = None
 
     def update_pause_countdown(self):
-        """v12: 一時停止カウントダウン更新 - LAP・TOTALカウント制御"""
+        """v12: 一時停止カウントダウン更新 - 表示用カウントダウンのみ管理"""
         if self.race_paused and self.pause_countdown > 0:
             current_time = time.time()
             elapsed = current_time - self.pause_start_time
             remaining = 5.0 - elapsed
             
             if remaining <= 0:
-                # カウントダウン完了：LAP・TOTALカウント再開
-                pause_duration = current_time - self.pause_start_time
-                self.total_pause_time += pause_duration
-                
-                # レース再開
+                # カウントダウン表示完了（カウントアップは既に再開済み）
                 self.race_paused = False
                 self.pause_countdown = 0
                 
-                # ラップ時間と総時間を再計算（一時停止分を除外して復元）
-                if self.paused_lap_time is not None:
-                    self.current_lap_start = current_time - self.paused_lap_time
-                if self.paused_total_time is not None:
-                    self.race_start_time = current_time - self.paused_total_time
-                
-                print("✅ 5秒カウントダウン完了！LAP・TOTAL計測継続中")
-                print(f"📊 総一時停止時間: {self.total_pause_time:.1f}秒（計測から除外）")
-                
-                # 一時変数をクリア
-                self.paused_lap_time = None
+                print("✅ 5秒カウントダウン表示完了！LAP・TOTAL計測継続中")
                 self.paused_total_time = None
             else:
                 self.pause_countdown = remaining
@@ -596,11 +601,11 @@ class TeamsSimpleLaptimeSystemFixedV12:
                 color = self.colors['text_green']
             elif self.current_lap_number == lap_number:  # 現在進行中のラップ
                 if self.race_active and self.current_lap_start:
-                    if self.race_paused and self.paused_lap_time is not None:
-                        # 一時停止中：保存された時間を表示（カウント停止）
+                    if self.race_paused and self.pause_countdown <= 0 and self.paused_lap_time is not None:
+                        # 一時停止中（カウントダウン前）：保存された時間を表示
                         current_lap_time = self.paused_lap_time
                     else:
-                        # 通常時：リアルタイム計算
+                        # 通常時またはカウントダウン中：リアルタイム計算
                         current_lap_time = time.time() - self.current_lap_start
                     lap_text = f"LAP{lap_number}: {self.format_time(current_lap_time)}"
                     color = self.colors['text_yellow']
@@ -619,11 +624,11 @@ class TeamsSimpleLaptimeSystemFixedV12:
             total_text = f"TOTAL: {self.format_time(self.total_time)}"
             total_color = self.colors['text_yellow']
         elif self.race_active and self.race_start_time:  # レース中は動的表示
-            if self.race_paused and self.paused_total_time is not None:
-                # 一時停止中：保存された時間を表示（カウント停止）
+            if self.race_paused and self.pause_countdown <= 0 and self.paused_total_time is not None:
+                # 一時停止中（カウントダウン前）：保存された時間を表示
                 total = self.paused_total_time
             else:
-                # 通常時：リアルタイム計算
+                # 通常時またはカウントダウン中：リアルタイム計算
                 total = time.time() - self.race_start_time
             total_text = f"TOTAL: {self.format_time(total)}"
             total_color = self.colors['text_white']
