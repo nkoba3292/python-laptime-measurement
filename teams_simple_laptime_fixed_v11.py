@@ -827,4 +827,3 @@ if __name__ == "__main__":
     print("[v11] 救済システム（Rキーで5秒ペナルティ）")
     print("[v11] デバッグ強化版（1秒ごとmotion_pixels/contour詳細出力）")
     main()
-    main()
