@@ -292,24 +292,24 @@ class TeamsSimpleLaptimeSystemFixedV12:
             return  # レース中でない場合は何もしない
         
         if not self.race_paused:
-            # 1回目Rキー：一時停止開始（LAP・TOTALカウント停止）
+            # 1回目Rキー：LAP・TOTALの時間計測（カウントアップ）を停止
             self.race_paused = True
             self.pause_start_time = time.time()
             
-            # 現在のラップ時間と総時間を保存（カウント停止）
+            # 現在のラップ時間と総時間を保存（計測停止）
             if self.current_lap_start:
                 self.paused_lap_time = time.time() - self.current_lap_start
             if self.race_start_time:
                 self.paused_total_time = time.time() - self.race_start_time
             
-            print("⏸️ LAP・TOTALカウント一時停止！")
-            print("🔄 もう一度Rキーで再開準備（5秒カウントダウン開始）")
+            print("⏸️ LAP・TOTAL時間計測停止")
+            print("🔄 次のRキーでLAP・TOTAL計測再開 + 5秒カウントダウン表示")
         else:
-            # 2回目Rキー：再開準備（5秒カウントダウン開始）
+            # 2回目Rキー：LAP・TOTAL計測を再開して5秒カウントダウン表示
             self.pause_countdown = 5.0
             self.pause_start_time = time.time()  # カウントダウン開始時刻
-            print("🔄 LAP・TOTALカウント再開準備！5秒カウントダウン開始")
-            print("⏳ 5秒後にカウント自動再開します")
+            print("▶️ LAP・TOTAL計測再開！5秒カウントダウン表示開始")
+            print("⏳ 5秒間カウントダウンを表示します")
 
     def update_pause_countdown(self):
         """v12: 一時停止カウントダウン更新 - LAP・TOTALカウント制御"""
@@ -333,7 +333,7 @@ class TeamsSimpleLaptimeSystemFixedV12:
                 if self.paused_total_time is not None:
                     self.race_start_time = current_time - self.paused_total_time
                 
-                print("✅ LAP・TOTALカウント再開！計測継続")
+                print("✅ 5秒カウントダウン完了！LAP・TOTAL計測継続中")
                 print(f"📊 総一時停止時間: {self.total_pause_time:.1f}秒（計測から除外）")
                 
                 # 一時変数をクリア
@@ -634,8 +634,8 @@ class TeamsSimpleLaptimeSystemFixedV12:
         controls_y = 550
         controls = [
             "S: Race Prepare (Rolling Start)",
-            "R: LAP/TOTAL Count Pause/Resume Toggle",
-            "   1st R: Stop Count | 2nd R: Resume(5s)",
+            "R: LAP/TOTAL Time Count Control",
+            "   1st R: Stop Count | 2nd R: Resume + 5s Display",
             "Q: Race Stop", 
             "ESC: Exit",
             "SPACE: Manual Detection (No Camera Mode)",
