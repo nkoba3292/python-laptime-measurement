@@ -640,7 +640,7 @@ class TeamsSimpleLaptimeSystemFixedV12:
         
         # 一時停止時間表示
         if self.total_pause_time > 0:
-            pause_text = f"Pause Time: +{self.total_pause_time:.1f}s (Excluded)"
+            pause_text = f"Pause Count: +{self.total_pause_time:.1f}s (Excluded)"
             pause_surface = self.font_small.render(pause_text, True, self.colors['text_yellow'])
             self.screen.blit(pause_surface, (info_x, info_y + y_offset + 160))
         
