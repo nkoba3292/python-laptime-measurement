@@ -1,38 +1,28 @@
 {
-    "_comment": "システム設定ファイル",
-    "camera_settings": {
-        "overview_camera_index": 0,
-        "startline_camera_index": 1,
-        "overview_resolution": [1280, 720],
-        "startline_resolution": [640, 480],
-        "fps": 30
-    },
-    "race_settings": {
-        "max_laps": 3,
-        "detection_cooldown": 2.0,
-        "hide_timer_at_lap": 2.5
-    },
-    "display_settings": {
-        "window_width": 1280,
-        "window_height": 720,
-        "small_camera_ratio": 3,
-        "overlay_transparency": 0.7
-    },
-    "detection_settings": {
-        "motion_threshold": 30,
-        "motion_pixels_threshold": 1000,
-        "line_region_top": 0.4,
-        "line_region_bottom": 0.6
-    },
-    "sound_settings": {
-        "enable_sound": true,
-        "start_frequency": 880,
-        "finish_frequencies": [440, 880],
-        "sound_duration": 0.5
-    },
-    "data_settings": {
-        "auto_save": true,
-        "data_directory": "data",
-        "filename_format": "race_result_%Y%m%d_%H%M%S.json"
-    }
+  "camera_overview_id": 0,
+  "camera_start_line_id": 0,
+  "camera_settings": {
+    "overview_camera_index": 0,
+    "startline_camera_index": 0,
+    "frame_width": 640,
+    "frame_height": 480
+  },
+  "detection_settings": {
+    "motion_pixels_threshold": 15000,
+    "min_contour_area": 1000,
+    "detection_conditions_required": 2,
+    "motion_area_ratio_min": 0.0001,
+    "motion_area_ratio_max": 0.3,
+    "stable_frames_required": 6,
+    "motion_consistency_check": true
+  },
+  "race_settings": {
+    "max_laps": 3,
+    "detection_cooldown": 3.0
+  },
+  "background_subtractor_settings": {
+    "history": 1000,
+    "varThreshold": 25,
+    "detectShadows": true
+  }
 }

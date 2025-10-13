@@ -1,0 +1,114 @@
+# Python Laptime Measurement System .gitignore
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+laptime_debug_env/
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Race data and logs
+data/race_result_*.json
+*.log
+logs/
+
+# Audio files (large)
+sounds/*.wav
+sounds/*.mp3
+sounds/*.ogg
+
+# Test images and videos
+test_images_from_raspi/*.jpg
+test_images_from_raspi/*.png
+test_images_from_raspi/*.mp4
+test_images_from_raspi/*.avi
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+
+# Configuration files with sensitive data
+config_local.json
+config_private.json
+
+# SSH keys
+*.pub
+raspberry
+raspberry.key
+
+# Shell scripts (may contain sensitive paths)
+*.sh
+*.ps1
+
+# Nested projects
+python-laptime-measurement/

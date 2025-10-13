@@ -1,7 +1,24 @@
-# requirements.txt
-# 自動運転ミニカー予選タイム計測システム用ライブラリ
+# Python Laptime Measurement System Requirements
+# Core dependencies for the laptime measurement system
 
-opencv-python==4.8.1.78
-numpy==1.24.3
-pygame==2.5.2
-pathlib
+# Computer Vision and Image Processing
+opencv-python>=4.5.0
+numpy>=1.20.0
+
+# GUI and Display
+pygame>=2.0.0
+
+# Audio processing (for sound notifications)
+pygame>=2.0.0  # Already includes audio support
+
+# Data handling
+# json is built-in to Python
+
+# System and OS interaction
+# os, sys, time are built-in to Python
+
+# Optional: Enhanced features
+# Uncomment if needed for advanced features
+# matplotlib>=3.3.0  # For data visualization
+# pillow>=8.0.0      # For advanced image processing
+# scipy>=1.6.0       # For signal processing
